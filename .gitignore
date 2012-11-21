@@ -10,3 +10,10 @@
 *.lai
 *.la
 *.a
+
+# folder
+/traces/*
+/result/
+
+# special cases
+!/traces/traceParse.py

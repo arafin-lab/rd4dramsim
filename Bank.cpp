@@ -40,23 +40,48 @@ namespace DRAMSim
 {
 	using namespace std;
 
+
+	int Bank::READ(BusPacket *busPacket)
+	{
+		if (busPacket->busPacketType == BusPacket::READ)
+		{
+			busPacket->busPacketType = BusPacket::DATA;
+		}
+#ifdef DATA_RELIABILITY_ICDP
+		else
+		{
+				busPacket->busPacketType = BusPacket::REG_DATA;
+		}
+#endif
+		return 0;
+	}
+
+	int Bank::WRITE(BusPacket *busPacket)
+	{
+		return 0;
+	}
+
 	unsigned Bank::getByteOffsetInRow(const BusPacket *busPacket)
 	{
 		// This offset will simply be all of the bits in the unaligned address that
 		// have been removed (i.e. the lower 6 bits for BL=8 and the lower 5 bits
 		// for BL=4) plus the column offset
+
+
 #ifdef DATA_RELIABILITY
-		uint64_t transactionMask = ECC_TRANS_DATA_BYTES - 1; //ex: (64 bit bus width) x (8 Burst Length) - 1 = 64 bytes - 1 = 63 = 0x3f mask
+		unsigned transOffset = 0;
 #else
 		uint64_t transactionMask = TRANS_DATA_BYTES - 1; //ex: (64 bit bus width) x (8 Burst Length) - 1 = 64 bytes - 1 = 63 = 0x3f mask
+		unsigned transOffset = busPacket->data->getAddr() & transactionMask;
 #endif
-		unsigned byteOffset = busPacket->data->getAddr() & transactionMask;
-		unsigned columnOffset = (busPacket->column * DEVICE_WIDTH)/8;
-		unsigned offset = columnOffset + byteOffset;
 
-		DEBUG("[DPKT] "<< *(busPacket->data) << " \t r="<<busPacket->row<<" c="<<busPacket->column<<" byte offset="<< byteOffset<< "-> "<<offset);
+		unsigned columnOffset = busPacket->column * TRANS_TOTAL_BYTES/BL;
+		unsigned byteOffset = columnOffset + transOffset;
 
-		return offset;
+		//FIXME: DEBUG DATA
+		//DEBUG("[DPKT] "<< *(busPacket->data) << " \t r="<<busPacket->row<<" c="<<busPacket->column<<" transOffset="<< transOffset<< "  --> "<< byteOffset);
+
+		return byteOffset;
 	}
 
 	void Bank::write(const BusPacket *busPacket)
@@ -68,7 +93,7 @@ namespace DRAMSim
 		if (it == rowEntries.end())
 		{
 			// row doesn't exist yet, allocate it
-			rowData = (byte *)calloc((NUM_COLS*DEVICE_WIDTH)/8,sizeof(byte));
+			rowData = (byte *)calloc((NUM_COLS * TRANS_TOTAL_BYTES/BL),sizeof(byte));
 			rowEntries[busPacket->row] = rowData;
 		}
 		else
@@ -78,13 +103,13 @@ namespace DRAMSim
 
 
 	#ifdef DATA_RELIABILITY
-		size_t transactionSize = ECC_TRANS_DATA_BYTES;
+		size_t transactionSize = TRANS_TOTAL_BYTES;
 	#else
 		size_t transactionSize = busPacket->data->getNumBytes();
 	#endif
 
 		// if we out of bound a row, this is a problem
-		if (byteOffset + transactionSize > NUM_COLS*DEVICE_WIDTH)
+		if (byteOffset + transactionSize > NUM_COLS * TRANS_TOTAL_BYTES/BL)
 		{
 			ERROR("Transaction out of bounds a row, check alignment of the address");
 			exit(-1);
@@ -99,25 +124,41 @@ namespace DRAMSim
 	{
 		assert(busPacket->data == NULL);
 
+		unsigned byteOffset = 0;
+		//unsigned transOffset = 0;
+
+#ifdef DATA_RELIABILITY
+		unsigned transOffset = 0;
+#else
+		uint64_t transactionMask = TRANS_DATA_BYTES - 1; //ex: (64 bit bus width) x (8 Burst Length) - 1 = 64 bytes - 1 = 63 = 0x3f mask
+		unsigned transOffset = busPacket->physicalAddress & transactionMask;
+#endif
 
 		busPacket->busPacketType = BusPacket::DATA;
-		busPacket->data = new DataPacket(NULL, SUBARRAY_DATA_BYTES*busPacket->len, busPacket->physicalAddress);
+		busPacket->data = new DataPacket(NULL, SUBRANK_DATA_BYTES*busPacket->len, busPacket->physicalAddress);
 
 		RowMapType::iterator it = rowEntries.find(busPacket->row);
 		if (it != rowEntries.end())
 		{
 			byte *rowData = it->second;
-			byte *dataBuf = (byte *)calloc(sizeof(byte), SUBARRAY_DATA_BYTES*busPacket->len);
-			memcpy(dataBuf, rowData + (busPacket->column*DEVICE_WIDTH)/8, SUBARRAY_DATA_BYTES*busPacket->len);
-			busPacket->data->setData(dataBuf, SUBARRAY_DATA_BYTES*busPacket->len, false);
-			DEBUG("[DPKT] Rank returning: "<<*(busPacket->data));
+			byte *dataBuf = (byte *)calloc(sizeof(byte), SUBRANK_DATA_BYTES*busPacket->len);
+			byteOffset = busPacket->column * TRANS_TOTAL_BYTES/BL + transOffset;
+			memcpy(dataBuf, rowData + byteOffset, SUBRANK_DATA_BYTES*busPacket->len);
+			busPacket->data->setData(dataBuf, SUBRANK_DATA_BYTES*busPacket->len, false);
+			//FIXME: DEBUG DATA
+			//DEBUG("[DPKT] Rank returning: "<<*(busPacket->data) << " \t r="<<busPacket->row<<" c="<<busPacket->column<<" transOffset="<< transOffset << "  --> "<< byteOffset);
 		}
 		else
 		{
 #ifdef RETURN_TRANSACTIONS
-			byte *dataBuf = (byte *)calloc(sizeof(byte), SUBARRAY_DATA_BYTES*busPacket->len);
-			busPacket->data->setData(dataBuf, SUBARRAY_DATA_BYTES*busPacket->len, false);
-			DEBUG("[DPKT] Rank returning: "<<*(busPacket->data));
+	#ifdef DATA_STORAGE
+			byte *dataBuf = (byte *)calloc(sizeof(byte), SUBRANK_DATA_BYTES*busPacket->len);
+			//FIXME: DEBUG DATA
+			//DEBUG("[DPKT] Rank returning: "<<*(busPacket->data) << " \t r="<<busPacket->row<<" c="<<busPacket->column<<" transOffset="<< transOffset);
+	#else
+			byte *dataBuf = NULL;
+	#endif
+			busPacket->data->setData(dataBuf, SUBRANK_DATA_BYTES*busPacket->len, false);
 #endif
 		}
 

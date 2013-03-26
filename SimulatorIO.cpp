@@ -276,7 +276,7 @@ namespace DRAMSim
 		}
 		else
 		{
-			DEBUG("vis file output disabled");
+			DEBUG("== Vis file output is disabled ==");
 		}
 
 	#ifdef LOG_OUTPUT
@@ -344,7 +344,7 @@ namespace DRAMSim
 		byte *dataBuffer = NULL;
 		DataPacket *dataPacket = NULL;
 		string addressStr="", cmdStr="", dataStr="", ccStr="";
-		size_t subrankLen = LEN_DEF;
+		size_t subrankLen = TRANS_DATA_BYTES/SUBRANK_DATA_BYTES;
 
 		switch (traceType)
 		{
@@ -464,8 +464,7 @@ namespace DRAMSim
 				}
 
 		#ifdef DATA_STORAGE_SSR
-				size_t transBytes = SUBARRAY_DATA_BYTES*subrankLen;
-				stringBytes = transBytes;
+				size_t transBytes = SUBRANK_DATA_BYTES*subrankLen;
 		#else
 				size_t transBytes = TRANS_DATA_BYTES;
 		#endif

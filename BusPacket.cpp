@@ -66,7 +66,18 @@ namespace DRAMSim
 		column(col),
 		data(dat),
 		len(len),
-		ssrData(NULL) {}
+		ssrData(NULL)
+	{
+
+#ifdef DATA_RELIABILITY_ECC
+		this->len = TRANS_TOTAL_BYTES/SUBRANK_DATA_BYTES;
+#endif
+
+#ifdef DATA_RELIABILITY_CHIPKILL
+		this->len = TRANS_TOTAL_BYTES/SUBRANK_DATA_BYTES;
+#endif
+
+	}
 
 	void BusPacket::print(uint64_t currentClockCycle, bool dataStart)
 	{
@@ -125,6 +136,11 @@ namespace DRAMSim
 			case READ_P:
 				PRINT("BP [READ_P] pa[0x"<<hex<<physicalAddress<<dec<<"] r["<<rank<<"] b["<<bank<<"] row["<<row<<"] col["<<column<<"]");
 				break;
+#ifdef DATA_RELIABILITY_ICDP
+			case PRE_READ:
+				PRINT("BP [PRE_READ] pa[0x"<<hex<<physicalAddress<<dec<<"] r["<<rank<<"] b["<<bank<<"] row["<<row<<"] col["<<column<<"]");
+				break;
+#endif
 			case WRITE:
 				PRINT("BP [WRITE] pa[0x"<<hex<<physicalAddress<<dec<<"] r["<<rank<<"] b["<<bank<<"] row["<<row<<"] col["<<column<<"]");
 				break;
@@ -188,8 +204,8 @@ namespace DRAMSim
 #endif
 
 
-#ifdef DATA_RELIABILITY_CHIPKILL_SSR
-		CHIPKILL_SSR(ENCODE);
+#ifdef DATA_RELIABILITY_ICDP
+		ICDP(ENCODE);
 #endif
 	}
 
@@ -205,14 +221,14 @@ namespace DRAMSim
 #endif
 
 
-#ifdef DATA_RELIABILITY_CHIPKILL_SSR
-		CHIPKILL_SSR(DECODE);
+#ifdef DATA_RELIABILITY_ICDP
+		ICDP(DECODE);
 #endif
 	}
 
-	bool BusPacket::DATA_CHECK()
+	int BusPacket::DATA_CHECK()
 	{
-		bool result=false;
+		int result;
 
 #ifdef DATA_RELIABILITY_CHIPKILL
 		CHIPKILL(DECODE);
@@ -227,16 +243,16 @@ namespace DRAMSim
 #endif
 
 
-#ifdef DATA_RELIABILITY_CHIPKILL_SSR
-		result = CHIPKILL_SSR(CHECK);
+#ifdef DATA_RELIABILITY_ICDP
+		result = ICDP(CHECK);
 #endif
 
 		return result;
 	}
 
-	bool BusPacket::DATA_CORRECTION()
+	int BusPacket::DATA_CORRECTION()
 	{
-		bool result=false;
+		int result;
 
 #ifdef DATA_RELIABILITY_CHIPKILL
 		CHIPKILL(DECODE);
@@ -251,32 +267,33 @@ namespace DRAMSim
 #endif
 
 
-#ifdef DATA_RELIABILITY_CHIPKILL_SSR
-		result = CHIPKILL_SSR(CORRECTION);
+#ifdef DATA_RELIABILITY_ICDP
+		result = ICDP(CORRECTION);
 #endif
 
 		return result;
 	}
 
 
-#ifdef DATA_RELIABILITY_CHIPKILL_SSR
+#ifdef DATA_RELIABILITY_ICDP
 
-	bool BusPacket::CHIPKILL_SSR(RELIABLE_OP op)
+	int BusPacket::ICDP(RELIABLE_OP op)
 	{
+		/* Legency Codes
 		int parityPosition = column/(DEVICE_WIDTH*(NUM_DEVICES-2*NUM_RANKS));
 
 		switch (op)
 		{
 		case ENCODE:
 		{
-			byte *encodeData = new byte[ECC_TRANS_DATA_BYTES];
-			memcpy(encodeData, ssrData->data->getData(), ECC_TRANS_DATA_BYTES);
+			byte *encodeData = new byte[TRANS_TOTAL_BYTES];
+			memcpy(encodeData, ssrData->data->getData(), TRANS_TOTAL_BYTES);
 
 			//update data
 			for (int iEncode=0,iUpdate=0; iUpdate < len; iEncode++)
 			{
 				if (iEncode == parityPosition) continue;
-				memcpy(encodeData+iEncode*SUBARRAY_DATA_BYTES, data->getData()+iUpdate*SUBARRAY_DATA_BYTES, SUBARRAY_DATA_BYTES);
+				memcpy(encodeData+iEncode*SUBRANK_DATA_BYTES, data->getData()+iUpdate*SUBRANK_DATA_BYTES, SUBRANK_DATA_BYTES);
 				iUpdate++;
 			}
 
@@ -284,23 +301,23 @@ namespace DRAMSim
 			for (int i=0; i < LEN_DEF; i++)
 			{
 				if (i == parityPosition) continue;
-				for (int j=0; j < SUBARRAY_DATA_BYTES;j++)
+				for (int j=0; j < SUBRANK_DATA_BYTES;j++)
 				{
-					encodeData[parityPosition*SUBARRAY_DATA_BYTES + j] ^= encodeData[i*SUBARRAY_DATA_BYTES + j];
+					encodeData[parityPosition*SUBRANK_DATA_BYTES + j] ^= encodeData[i*SUBRANK_DATA_BYTES + j];
 				}
 			}
 
 			//calculate checksum
 			for (int i=0; i < LEN_DEF;i++)
 			{
-				for (int j=0; j < SUBARRAY_DATA_BYTES; j++)
+				for (int j=0; j < SUBRANK_DATA_BYTES; j++)
 				{
 					if (i == parityPosition) continue;
-					encodeData[(LEN_DEF-1)*SUBARRAY_DATA_BYTES + i] ^= encodeData[i*SUBARRAY_DATA_BYTES + j];
+					encodeData[(LEN_DEF-1)*SUBRANK_DATA_BYTES + i] ^= encodeData[i*SUBRANK_DATA_BYTES + j];
 				}
 			}
 
-			data->setData(encodeData,ECC_TRANS_DATA_BYTES,false);
+			data->setData(encodeData,TRANS_TOTAL_BYTES,false);
 
 			break;
 		}
@@ -311,7 +328,7 @@ namespace DRAMSim
 			for (int i=0,j=0; i < len; j++)
 			{
 				if (j == parityPosition) continue;
-				memcpy(decodeData+i*SUBARRAY_DATA_BYTES, data->getData()+j*SUBARRAY_DATA_BYTES, SUBARRAY_DATA_BYTES);
+				memcpy(decodeData+i*SUBRANK_DATA_BYTES, data->getData()+j*SUBRANK_DATA_BYTES, SUBRANK_DATA_BYTES);
 				i++;
 			}
 
@@ -332,6 +349,37 @@ namespace DRAMSim
 		}
 		DEBUG("Unexpected Executing Location");
 		return false;
+		*/
+
+		switch (op)
+		{
+		case ENCODE:
+		{
+
+			break;
+		}
+		case DECODE:
+		{
+
+			break;
+		}
+		case CHECK:
+		{
+			return 0;
+			break;
+		}
+		case CORRECTION:
+		{
+			return 0;
+			break;
+		}
+		default:
+			DEBUG("Invalid ECC Operation Type");
+			return false;
+			break;
+		}
+
+		return 0;
 	}
 
 #endif
@@ -339,29 +387,53 @@ namespace DRAMSim
 
 
 #ifdef DATA_RELIABILITY_ECC
-	bool BusPacket::ECC_HAMMING_SECDED(RELIABLE_OP eccop, int n, int m)
+	int BusPacket::ECC_HAMMING_SECDED(RELIABLE_OP eccop, int n, int m)
 	{
-		if (data->getData() == NULL) return true;
+		if (data->getData() == NULL) return -1;
 
 		int c = n - m;
-		int dataBytes = JEDEC_DATA_BUS_BITS * BL / 8;
-		int eccDataBytes = ECC_DATA_BUS_BITS * BL / 8;
-		int l = eccDataBytes*8 / n;
-		int r = eccDataBytes*8 % n;
-		l = (r == 0) ? l : (l + 1);
+		int l = TRANS_TOTAL_BYTES*8 / n;
+
+		bitset<TRANS_DATA_BYTES*8> transDataBits;
+		bitset<TRANS_TOTAL_BYTES*8> transBits1;
+		bitset<TRANS_TOTAL_BYTES*8> transBits2;
+		bitset<ECC_WORD_BITS> busEccBits;
 
 		switch (eccop)
 		{
+		case DECODE:
+		case CHECK:
+		case CORRECTION:
+		{
+
+			BitsfromByteArray(transBits1,TRANS_TOTAL_BYTES);
+
+			for (int iLoop = 0; iLoop < l; iLoop++)
+			{
+				for (int iData = 0; iData < m; iData++)
+				{
+					transDataBits[iLoop*m + iData] = transBits1[iLoop*n + iData];
+				}
+			}
+			if (eccop == DECODE)
+			{
+				data->setData(BitstoByteArray(transDataBits), TRANS_DATA_BYTES, false);
+				return 1;
+				break;
+			}
+		}
+		//end of DECODE
+		//begin of ENCODE
 		case ENCODE:
 		{
-			bitset<JEDEC_DATA_BITS> plainDataBits;
-			bitset<ECC_DATA_BITS> eccDataBits;
-			bitset<ECC_CHECK_BITS> eccCheckBits;
-			BitsfromByteArray(plainDataBits,dataBytes);
+			if (eccop == ENCODE)
+			{
+				BitsfromByteArray(transDataBits,TRANS_DATA_BYTES);
+			}
 
 			for (int iLoop=0; iLoop < l; iLoop++)
 			{
-				eccCheckBits.reset();
+				busEccBits.reset();
 				for (int iCheck = 0; iCheck < c-1; iCheck++)
 				{
 					int checkBitCounter = (iCheck == 0) ? (2) : (iCheck + 1);
@@ -375,12 +447,12 @@ namespace DRAMSim
 					{
 						if (first == true)
 						{
-							eccCheckBits[iCheck] = plainDataBits[iLoop*m + iData];
+							busEccBits[iCheck] = transDataBits[iLoop*m + iData];
 							first = false;
 						}
 						else
 						{
-							eccCheckBits[iCheck] = eccCheckBits[iCheck]^plainDataBits[iLoop*m + iData];
+							busEccBits[iCheck] = busEccBits[iCheck]^transDataBits[iLoop*m + iData];
 						}
 
 						iData++;
@@ -403,95 +475,69 @@ namespace DRAMSim
 					int iCheck = iData - m;
 					if (iCheck < 0)
 					{
-						eccDataBits[iLoop*n + iData] = plainDataBits[iLoop*m + iData];
+						transBits2[iLoop*n + iData] = transDataBits[iLoop*m + iData];
 					}
 					else
 					{
-						eccDataBits[iLoop*n + iData] = eccCheckBits[iCheck];
+						transBits2[iLoop*n + iData] = busEccBits[iCheck];
 					}
 
 					if (iData == 0)
 					{
-						eccDataBits[iLoop*n + (n-1)] = eccDataBits[iLoop*n + iData];
+						transBits2[iLoop*n + (n-1)] = transBits2[iLoop*n];
 					}
 					else
 					{
-						eccDataBits[iLoop*n + (n-1)] = eccDataBits[iLoop*n + (n-1)] ^ eccDataBits[iLoop*n + iData];
+						transBits2[iLoop*n + (n-1)] = transBits2[iLoop*n + (n-1)] ^ transBits2[iLoop*n + iData];
 					}
 				}
 
 			} // end of iLoop
-			data->setData(BitstoByteArray(eccDataBits), eccDataBytes, false);
 
-			return true;
-			break;
-		}
-		case DECODE:
-		{
-			bitset<ECC_DATA_BITS> eccDataBits;
-			bitset<JEDEC_DATA_BITS> plainDataBits;
-			BitsfromByteArray(eccDataBits,eccDataBytes);
-
-			for (int iLoop = 0; iLoop < l; iLoop++)
+			if (eccop == ENCODE)
 			{
-				for (int iData = 0; iData < m; iData++)
-				{
-					plainDataBits[iLoop*m + iData] = eccDataBits[iLoop*n + iData];
-				}
-			}
-			data->setData(BitstoByteArray(plainDataBits), dataBytes, false);
+				data->setData(BitstoByteArray(transBits2), TRANS_TOTAL_BYTES, false);
 
-			return true;
-			break;
-		}
-		case CHECK:
-		case CORRECTION:
-		{
+				return 1;
+				break;
+			}
+			// end of ENCODE
+			//begin of CHECK&CORRECTION
 			int wordErrorNum = 0;
 			int dataErrorNum = 0;
-			bool noError = true;
-			bool killError = true;
+			int killErrorNum = 0;
 
-			bitset<ECC_CHECK_BITS> eccCheckBits;
-			bitset<ECC_DATA_BITS> eccDataBits;
-			BitsfromByteArray(eccDataBits,eccDataBytes);
-
+			bitset<ECC_WORD_BITS> busErrorBits;
 
 			for (int iLoop=0; iLoop < l; iLoop++)
 			{
 				int iErrorPosition = 0;
+				busErrorBits.reset();
 
 				for (int iCheck = 0; iCheck < c; iCheck++)
 				{
-					eccCheckBits[iCheck] = eccDataBits[iLoop*n + m + iCheck];
-					iErrorPosition = (eccCheckBits[iCheck] == 1) ? (iErrorPosition + pow(2.0,iCheck)) : iErrorPosition;
+					busErrorBits[iCheck] = transBits1[iLoop*n + m + iCheck]^transBits2[iLoop*n + m + iCheck];
+					iErrorPosition = (busErrorBits[iCheck] == 1) ? (iErrorPosition + pow(2.0,iCheck)) : iErrorPosition;
 				}
 
-				if (eccCheckBits[c-1] == 0 && iErrorPosition == 0)
+				if (busErrorBits[c-1] == 0 && iErrorPosition == 0)
 				{
 					wordErrorNum = 0;
 				}
-				else if (eccCheckBits[c-1] == 1 && iErrorPosition != 0)
+				else if (busErrorBits[c-1] == 1 && iErrorPosition != 0)
 				{
-					noError = false;
 					wordErrorNum = 1;
 				}
-				else if (eccCheckBits[c-1] == 0 && iErrorPosition != 0)
+				else if (busErrorBits[c-1] == 0 && iErrorPosition != 0)
 				{
-					noError = false;
-					killError = false;
 					wordErrorNum = 2;
 				}
-				else if (eccCheckBits[c-1] == 1 && iErrorPosition == 0)
+				else if (busErrorBits[c-1] == 1 && iErrorPosition == 0)
 				{
-					noError = false;
-					killError = false;
 					wordErrorNum = 3;
 				}
 				else
 				{
-					noError = false;
-					killError = false;
 					wordErrorNum = 3;
 				}
 
@@ -509,7 +555,8 @@ namespace DRAMSim
 							checkBitCounter++;
 						}
 					}
-					eccDataBits[iLoop*n + iErrorPosition].flip();
+					transBits1[iLoop*n + iErrorPosition].flip();
+					killErrorNum++;
 				}
 
 				dataErrorNum += wordErrorNum;
@@ -517,17 +564,17 @@ namespace DRAMSim
 			}
 
 			if (eccop == CHECK)
-				return noError;
+				return dataErrorNum;
 			else
 				if (eccop == CORRECTION)
-					data->setData(BitstoByteArray(eccDataBits), eccDataBytes, false);
-				return killError;
+					data->setData(BitstoByteArray(transBits1), TRANS_TOTAL_BYTES, false);
+				return (dataErrorNum-killErrorNum);
 
 			break;
 		}
 		default:
 			DEBUG("Invalid ECC Operation Type");
-			return false;
+			return -1;
 			break;
 		}
 		DEBUG("Unexpected Executing Location");
@@ -541,47 +588,46 @@ namespace DRAMSim
 	{
 		if (data->getData() == NULL) return;
 
-		int chipkillDataBytes = ECC_DATA_BITS / 8;
 		int loop = BL;
 
 		switch (op)
 		{
 		case ENCODE:
 		{
-			bitset<ECC_DATA_BITS> chipkillDataBits;
-			bitset<ECC_DATA_BITS> eccDataBits;
-			BitsfromByteArray(eccDataBits,chipkillDataBytes);
+			bitset<TRANS_TOTAL_BYTES*8> chipkillDataBits;
+			bitset<TRANS_TOTAL_BYTES*8> eccDataBits;
+			BitsfromByteArray(eccDataBits,TRANS_TOTAL_BYTES);
 
 			for (int iLoop=0; iLoop < loop; iLoop++)
 			{
 				for (int iWord = 0; iWord < (int)(DEVICE_WIDTH); iWord++)
 				{
-					for (int iData = 0; iData < ECC_WORD_BITS; iData++)
+					for (int iData = 0; iData < TOTAL_WORD_BITS; iData++)
 					{
-						chipkillDataBits[iData*DEVICE_WIDTH + iWord] = eccDataBits[iWord*ECC_WORD_BITS + iData];
+						chipkillDataBits[iData*DEVICE_WIDTH + iWord] = eccDataBits[iWord*TOTAL_WORD_BITS + iData];
 					}
 				}
 			}
-			data->setData(BitstoByteArray(chipkillDataBits), chipkillDataBytes, false);
+			data->setData( BitstoByteArray(chipkillDataBits), TRANS_TOTAL_BYTES, false);
 			break;
 		}
 		case DECODE:
 		{
-			bitset<ECC_DATA_BITS> chipkillDataBits;
-			bitset<ECC_DATA_BITS> eccDataBits;
-			BitsfromByteArray(chipkillDataBits,chipkillDataBytes);
+			bitset<TRANS_TOTAL_BYTES*8> chipkillDataBits;
+			bitset<TRANS_TOTAL_BYTES*8> eccDataBits;
+			BitsfromByteArray(chipkillDataBits,TRANS_TOTAL_BYTES);
 
 			for (int iLoop=0; iLoop < loop; iLoop++)
 			{
 				for (int iWord = 0; iWord < (int)(DEVICE_WIDTH); iWord++)
 				{
-					for (int iData = 0; iData < ECC_WORD_BITS; iData++)
+					for (int iData = 0; iData < TOTAL_WORD_BITS; iData++)
 					{
-						eccDataBits[iWord*ECC_WORD_BITS + iData] = chipkillDataBits[iData*DEVICE_WIDTH + iWord];
+						eccDataBits[iWord*TOTAL_WORD_BITS + iData] = chipkillDataBits[iData*DEVICE_WIDTH + iWord];
 					}
 				}
 			}
-			data->setData(BitstoByteArray(eccDataBits), chipkillDataBytes, false);
+			data->setData(BitstoByteArray(eccDataBits), TRANS_TOTAL_BYTES, false);
 			break;
 		}
 		case CHECK:
@@ -594,7 +640,7 @@ namespace DRAMSim
 
 #endif //DATA_RELIABILITY_ECC
 
-	byte *BusPacket::BitstoByteArray(bitset<JEDEC_DATA_BITS> &bits)
+	byte *BusPacket::BitstoByteArray(bitset<TRANS_DATA_BYTES*8> &bits)
 	{
 		int len=bits.size()/8;
 		byte *bytes = (byte *)calloc(len, sizeof(byte));
@@ -613,7 +659,7 @@ namespace DRAMSim
 	}
 
 
-	byte *BusPacket::BitstoByteArray(bitset<ECC_DATA_BITS> &bits)
+	byte *BusPacket::BitstoByteArray(bitset<TRANS_TOTAL_BYTES*8> &bits)
 	{
 		int len=bits.size()/8;
 		byte *bytes = (byte *)calloc(len, sizeof(byte));

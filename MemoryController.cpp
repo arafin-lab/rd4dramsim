@@ -287,8 +287,12 @@ namespace DRAMSim
 
 			switch (poppedBusPacket->busPacketType)
 			{
+	#ifdef DATA_RELIABILITY_ICDP
+				case BusPacket::PRE_READ:
+	#endif
 				case BusPacket::READ_P:
 				case BusPacket::READ:
+					//TODO: calculate power for reliable operations
 					//add energy to account for total
 					if (DEBUG_POWER)
 					{
@@ -309,8 +313,16 @@ namespace DRAMSim
 						bankStates[rank][bank].nextPrecharge = max(currentClockCycle + READ_TO_PRE_DELAY,
 								bankStates[rank][bank].nextPrecharge);
 						bankStates[rank][bank].lastCommand = BusPacket::READ;
-
 					}
+#ifdef DATA_RELIABILITY_ICDP
+					else if (poppedBusPacket->busPacketType == BusPacket::PRE_READ)
+					{
+						bankStates[rank][bank].nextPrecharge = max(currentClockCycle + READ_TO_PRE_DELAY,
+								bankStates[rank][bank].nextPrecharge);
+						bankStates[rank][bank].lastCommand = BusPacket::READ;
+					}
+#endif
+
 
 					for (size_t i=0;i<NUM_RANKS;i++)
 					{
@@ -322,15 +334,13 @@ namespace DRAMSim
 								if (bankStates[i][j].currentBankState == BankState::RowActive)
 								{
 									bankStates[i][j].nextRead = max(currentClockCycle + BL/2 + tRTRS, bankStates[i][j].nextRead);
-									bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY,
-											bankStates[i][j].nextWrite);
+									bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY, bankStates[i][j].nextWrite);
 								}
 							}
 							else
 							{
 								bankStates[i][j].nextRead = max(currentClockCycle + max(tCCD, BL/2), bankStates[i][j].nextRead);
-								bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY,
-										bankStates[i][j].nextWrite);
+								bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY, bankStates[i][j].nextWrite);
 							}
 						}
 					}
@@ -345,10 +355,17 @@ namespace DRAMSim
 
 						cmdStat.readpCounter++;
 					}
-					else
+					else if (poppedBusPacket->busPacketType == BusPacket::READ)
 					{
 						cmdStat.readCounter++;
 					}
+#ifdef DATA_RELIABILITY_ICDP
+					else if (poppedBusPacket->busPacketType == BusPacket::PRE_READ)
+					{
+						cmdStat.prereadCounter++;
+					}
+#endif
+
 
 					break;
 				case BusPacket::WRITE_P:
@@ -508,9 +525,15 @@ namespace DRAMSim
 			// pass these in as references so they get set by the addressMapping function
 			parentMemorySystem->addressMapping(transaction->address, newChan, newRank, newBank, newRow, newColumn);
 
+			unsigned cmdNum=2;
+			BusPacket::BusPacketType bpType = transaction->getBusPacketType();
+
+#ifdef DATA_RELIABILITY_ICDP
+			cmdNum=(bpType == BusPacket::WRITE || bpType == BusPacket::WRITE_P)?4:2;
+#endif
 			//if we have room, break up the transaction into the appropriate commands
 			//and add them to the command queue
-			if (commandQueue.hasRoomFor(2, newRank, newBank))
+			if (commandQueue.hasRoomFor( cmdNum, newRank, newBank))
 			{
 				if (DEBUG_ADDR_MAP)
 				{
@@ -535,6 +558,34 @@ namespace DRAMSim
 				//now that we know there is room in the command queue, we can remove from the transaction queue
 				transactionQueue.erase(transactionQueue.begin()+i);
 
+				//create PRE_READ command when write
+	#ifdef DATA_RELIABILITY_ICDP
+				if (bpType == BusPacket::WRITE || bpType == BusPacket::WRITE_P)
+				{
+
+					BusPacket *PRE_ACTcommand = new BusPacket(BusPacket::ACTIVATE,
+														  newRank,
+														  newBank,
+														  newRow,
+														  newColumn,
+														  transaction->address,
+														  NULL,
+														  transaction->len);
+					commandQueue.enqueue(PRE_ACTcommand);
+
+					int l = transaction->len;
+					BusPacket *PREcommand = new BusPacket(BusPacket::PRE_READ,
+														  newRank,
+														  newBank,
+														  newRow,
+														  newColumn,
+														  transaction->address,
+														  transaction->data,
+														  (l>8-l)?(8-l):l);
+					commandQueue.enqueue(PREcommand);
+				}
+	#endif
+
 				//create activate command to the row we just translated
 				BusPacket *ACTcommand = new BusPacket(BusPacket::ACTIVATE,
 													  newRank,
@@ -544,9 +595,9 @@ namespace DRAMSim
 													  transaction->address,
 													  NULL,
 													  transaction->len);
+				commandQueue.enqueue(ACTcommand);
 
 				//create read or write command and enqueue it
-				BusPacket::BusPacketType bpType = transaction->getBusPacketType();
 				BusPacket *command = new BusPacket(bpType,
 												   newRank,
 												   newBank,
@@ -555,10 +606,6 @@ namespace DRAMSim
 												   transaction->address,
 												   transaction->data,
 												   transaction->len);
-
-
-
-				commandQueue.enqueue(ACTcommand);
 				commandQueue.enqueue(command);
 
 				// If we have a read, save the transaction so when the data comes back
@@ -699,20 +746,22 @@ namespace DRAMSim
 			{
 				if (pendingReadTransactions[i]->address == returnTransaction[0]->address)
 				{
-					//if(currentClockCycle - pendingReadTransactions[i]->timeAdded > 2000)
-					//	{
-					//		pendingReadTransactions[i]->print();
-					//		exit(0);
-					//	}
+					/*
+					if(Simulator::clockDomainDRAM->clockcycle - pendingReadTransactions[i]->timeAdded > 2000)
+					{
+						pendingReadTransactions[i]->print();
+						exit(0);
+					}
+					*/
 
 					unsigned chan,rank,bank,row,col;
 					parentMemorySystem->addressMapping(returnTransaction[0]->address,chan,rank,bank,row,col);
-					insertHistogram(Simulator::clockDomainCPU->clockcycle - pendingReadTransactions[i]->timeAdded,rank,bank);
+					insertHistogram((Simulator::clockDomainCPU->clockcycle - pendingReadTransactions[i]->timeAdded),rank,bank);
 
 					//return latency
 					if (parentMemorySystem->ReadDataDone!=NULL)
 					{
-						(*parentMemorySystem->ReadDataDone)(channelID, pendingReadTransactions[i]->address, Simulator::clockDomainDRAM->clockcycle);
+						(*parentMemorySystem->ReadDataDone)(channelID, pendingReadTransactions[i]->address, Simulator::clockDomainCPU->clockcycle);
 					}
 
 					delete pendingReadTransactions[i];
@@ -885,8 +934,7 @@ namespace DRAMSim
 			cyclesElapsed = currentClockCycle % EPOCH_LENGTH;
 		}
 
-		unsigned bytesPerTransaction = (JEDEC_DATA_BUS_BITS*BL)/8;
-		uint64_t totalBytesTransferred = totalTransactions * bytesPerTransaction;
+		uint64_t totalBytesTransferred = totalTransactions * TRANS_DATA_BYTES;
 		double secondsThisEpoch = (double)cyclesElapsed * tCK * 1E-9;
 
 		// only per rank
@@ -905,8 +953,8 @@ namespace DRAMSim
 		{
 			for (size_t j=0; j<NUM_BANKS; j++)
 			{
-				bandwidth[SEQUENTIAL(i,j)] = (((double)(totalReadsPerBank[SEQUENTIAL(i,j)]+totalWritesPerBank[SEQUENTIAL(i,j)]) * (double)bytesPerTransaction)/(1024.0*1024.0*1024.0)) / secondsThisEpoch;
-				averageLatency[SEQUENTIAL(i,j)] = ((float)totalEpochLatency[SEQUENTIAL(i,j)] / (float)(totalReadsPerBank[SEQUENTIAL(i,j)])) * tCK;
+				bandwidth[SEQUENTIAL(i,j)] = (((double)(totalReadsPerBank[SEQUENTIAL(i,j)]+totalWritesPerBank[SEQUENTIAL(i,j)]) * (double)TRANS_DATA_BYTES)/(1024.0*1024.0*1024.0)) / secondsThisEpoch;
+				averageLatency[SEQUENTIAL(i,j)] = ((float)totalEpochLatency[SEQUENTIAL(i,j)] / (float)(totalReadsPerBank[SEQUENTIAL(i,j)])) * Simulator::clockDomainCPU->time;
 				totalBandwidth+=bandwidth[SEQUENTIAL(i,j)];
 				totalReadsPerRank[i] += totalReadsPerBank[SEQUENTIAL(i,j)];
 				totalWritesPerRank[i] += totalWritesPerBank[SEQUENTIAL(i,j)];
@@ -946,24 +994,22 @@ namespace DRAMSim
 
 			PRINT( "    -Rank   "<<r<<" : ");
 			PRINTN( "        -Reads  : " << totalReadsPerRank[r]);
-			PRINT( " ("<<totalReadsPerRank[r] * bytesPerTransaction<<" bytes)");
+			PRINT( " ("<<totalReadsPerRank[r] * TRANS_DATA_BYTES<<" bytes)");
 			PRINTN( "        -Writes : " << totalWritesPerRank[r]);
-			PRINT( " ("<<totalWritesPerRank[r] * bytesPerTransaction<<" bytes)");
+			PRINT( " ("<<totalWritesPerRank[r] * TRANS_DATA_BYTES<<" bytes)");
 			for (size_t j=0;j<NUM_BANKS;j++)
 			{
 				PRINT( "      -Bandwidth / Latency  (Bank " <<j<<"): " <<bandwidth[SEQUENTIAL(r,j)] << " GB/s\t" <<averageLatency[SEQUENTIAL(r,j)] << " ns");
 			}
 
-			double tAveLatency;
-			for (size_t i=0; i<NUM_RANKS; i++)
+			double tAveLatency=0;
+			for (size_t j=0; j<NUM_BANKS; j++)
 			{
-				for (size_t j=0; j<NUM_BANKS; j++)
-				{
-					tAveLatency += averageLatency[SEQUENTIAL(i,j)];
-				}
+				tAveLatency += averageLatency[SEQUENTIAL(r,j)];
 			}
+
 			double totalRW=cmdStat.readCounter+cmdStat.readpCounter+cmdStat.writeCounter+cmdStat.writepCounter;
-			PRINT("      -Total    Average    Latency  :\t\t\t"<< tAveLatency/(NUM_RANKS*NUM_BANKS) <<" ns");
+			PRINT("      -Total    Average    Latency  :\t\t\t"<< tAveLatency/NUM_BANKS <<" ns");
 			PRINT("      -Workload Character[(clock*tck)/(Read+Write)] = \t"<< (cyclesElapsed*tCK)/totalRW <<" ns");
 
 
@@ -1050,6 +1096,7 @@ namespace DRAMSim
 			PRINT(" --- DDR DRAM Command Statistics");
 			PRINT("    READ:" << cmdStat.readCounter);
 			PRINT("    READ_P:" << cmdStat.readpCounter);
+			PRINT("    PRE_READ:" << cmdStat.prereadCounter);
 			PRINT("    WRITE:" << cmdStat.writeCounter);
 			PRINT("    WRITE_P:" << cmdStat.writepCounter);
 			PRINT("    ACTIVATE:" << cmdStat.activateCounter);

@@ -74,6 +74,7 @@ namespace DRAMSim
 		vector< uint64_t > burstEnergy;
 		vector< uint64_t > actpreEnergy;
 		vector< uint64_t > refreshEnergy;
+
 	private:
 		MemorySystem *parentMemorySystem;
 		vector<Rank *> *ranks;
@@ -125,6 +126,7 @@ namespace DRAMSim
 			{
 				readCounter=0;
 				readpCounter=0;
+				prereadCounter=0;
 				writeCounter=0;
 				writepCounter=0;
 				activateCounter=0;
@@ -133,6 +135,7 @@ namespace DRAMSim
 
 				readSum=0;
 				readpSum=0;
+				prereadSum=0;
 				writeSum=0;
 				writepSum=0;
 				activateSum=0;
@@ -142,6 +145,7 @@ namespace DRAMSim
 
 			unsigned readCounter;
 			unsigned readpCounter;
+			unsigned prereadCounter;
 			unsigned writeCounter;
 			unsigned writepCounter;
 			unsigned activateCounter;
@@ -150,6 +154,7 @@ namespace DRAMSim
 
 			unsigned readSum;
 			unsigned readpSum;
+			unsigned prereadSum;
 			unsigned writeSum;
 			unsigned writepSum;
 			unsigned activateSum;

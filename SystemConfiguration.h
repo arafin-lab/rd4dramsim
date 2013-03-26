@@ -48,39 +48,99 @@
 //SystemConfiguration.h
 //
 
-
-#define LEN_DEF 8
-#define ECC_LEN_DEF (LEN_DEF+2)
-#define MS_BUFFER
+//#define MEMORYSYSTEM_BUFFER
 
 #define RETURN_TRANSACTIONS
-#define DATA_STORAGE
+//#define DATA_STORAGE
 //#define DATA_STORAGE_SSR
-
 //#define DATA_RELIABILITY
 
 //#define DATA_RELIABILITY_ECC
 //#define DATA_RELIABILITY_CHIPKILL
-//#define DATA_RELIABILITY_CHIPKILL_SSR
-
-
-#ifdef DATA_RELIABILITY_CHIPKILL_SSR
-	#define DATA_STORAGE_SSR
-	#define DATA_RELIABILITY
-#endif
-
-#ifdef DATA_STORAGE_SSR
-	#define DATA_STORAGE
-#endif
-
-#ifdef DATA_RELIABILITY_CHIPKILL
-	#define DATA_RELIABILITY_ECC
-#endif
+#define DATA_RELIABILITY_ICDP
 
 #ifdef DATA_RELIABILITY_ECC
 	#define DATA_STORAGE
 	#define DATA_RELIABILITY
+
+	#define DATA_WORD_BITS 64
+	#define ECC_WORD_BITS 8
+	#define TOTAL_WORD_BITS 72
+
+	#define LEN_DEF 8
+	#define BUS_DATA_BITS 64
+	#define BUS_ECC_BITS 8
+	#define BUS_TOTAL_BITS 72
+
+	#define TRANS_DATA_BYTES 64
+	#define TRANS_ECC_BYTES 8
+	#define TRANS_TOTAL_BYTES 72
 #endif
+
+
+#ifdef DATA_RELIABILITY_CHIPKILL
+	#define DATA_STORAGE
+	#define DATA_RELIABILITY
+	#define DATA_RELIABILITY_ECC
+
+	#define LEN_DEF 36
+
+	#define DATA_WORD_BITS 64
+	#define ECC_WORD_BITS 8
+	#define TOTAL_WORD_BITS 72
+
+	#define BUS_DATA_BITS 256
+	#define BUS_ECC_BITS 32
+	#define BUS_TOTAL_BITS 288
+
+	#define TRANS_DATA_BYTES 256
+	#define TRANS_ECC_BYTES 32
+	#define TRANS_TOTAL_BYTES 288
+#endif
+
+
+#ifdef DATA_RELIABILITY_ICDP
+	#define DATA_STORAGE_SSR
+	#define DATA_STORAGE
+	#define DATA_RELIABILITY
+
+	#define LEN_DEF 10
+
+	#define DATA_WORD_BITS 64
+	#define ECC_WORD_BITS 8
+	#define CHECKSUM_BITS 8
+	#define TOTAL_WORD_BITS 80
+
+	#define BUS_DATA_BITS 64
+	#define BUS_ECC_BITS 8
+	#define BUS_CHECKSUM_BITS 8
+	#define BUS_TOTAL_BITS 80
+
+	#define TRANS_DATA_BYTES 64
+	#define TRANS_ECC_BYTES 8
+	#define TRANS_CHECKSUM_BYTES 8
+	#define TRANS_TOTAL_BYTES 80
+#endif
+
+
+#ifdef DATA_STORAGE_SSR
+	#define DATA_STORAGE
+
+	#define SUBRANK_DATA_BYTES 8
+#endif
+
+//default value without reliability design
+#ifndef DATA_RELIABILITY
+	#define BUS_DATA_BITS 64
+	#define BUS_TOTAL_BITS 64
+	#define TRANS_DATA_BYTES 64
+	#define TRANS_TOTAL_BYTES 64
+#endif
+
+#ifndef DATA_STORAGE_SSR
+	#define SUBRANK_DATA_BYTES 8
+#endif
+
 
 
 namespace DRAMSim
@@ -112,9 +172,6 @@ namespace DRAMSim
 	extern unsigned NUM_COLS;
 	extern unsigned DEVICE_WIDTH;
 
-	extern unsigned SUBARRAY_DATA_BYTES;
-	extern unsigned TRANS_DATA_BYTES;
-	extern unsigned ECC_TRANS_DATA_BYTES;
 
 	//in nanoseconds
 	extern unsigned REFRESH_PERIOD;
@@ -168,9 +225,6 @@ namespace DRAMSim
 	#define WRITE_AUTOPRE_DELAY (WL+BL/2+tWR+tRP)
 	#define WRITE_TO_READ_DELAY_B (WL+BL/2+tWTR) //interbank
 	#define WRITE_TO_READ_DELAY_R (WL+BL/2+tRTRS-RL) //interrank
-
-	extern unsigned ECC_DATA_BUS_BITS;
-	extern unsigned JEDEC_DATA_BUS_BITS;
 
 	//Memory Controller related parameters
 	extern unsigned TRANS_QUEUE_DEPTH;

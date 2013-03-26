@@ -274,7 +274,7 @@ namespace DRAMSim
 								{
 									//check to make sure we aren't removing a read/write that is paired with an activate
 									if (i>0 && queue[i-1]->busPacketType==BusPacket::ACTIVATE &&
-											queue[i-1]->physicalAddress == queue[i]->physicalAddress)
+											   queue[i-1]->physicalAddress == queue[i]->physicalAddress)
 										continue;
 
 									*busPacket = queue[i];
@@ -425,8 +425,8 @@ namespace DRAMSim
 								{
 									BusPacket *prevPacket = queue[j];
 									if (prevPacket->busPacketType != BusPacket::ACTIVATE &&
-											prevPacket->bank == packet->bank &&
-											prevPacket->row == packet->row)
+										prevPacket->bank == packet->bank &&
+										prevPacket->row == packet->row)
 									{
 										dependencyFound = true;
 										break;
@@ -570,7 +570,7 @@ namespace DRAMSim
 			PRINT(endl << "== Printing Per Rank Queue" );
 			for (size_t i=0;i<NUM_RANKS;i++)
 			{
-				PRINT(" = Rank " << i << "  size : " << queues[i][0].size() );
+				PRINT(" = Rank " << i << "  size : " << queues[i][0].size() <<"  Clock :" << Simulator::clockDomainDRAM->clockcycle);
 				for (size_t j=0;j<queues[i][0].size();j++)
 				{
 					PRINTN("    "<< j << "]");
@@ -647,17 +647,10 @@ namespace DRAMSim
 			break;
 		case BusPacket::WRITE:
 		case BusPacket::WRITE_P:
-	#ifdef DATA_RELIABILITY_CHIPKILL_SSR
 			if (bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::RowActive &&
-					currentClockCycle >= bankStates[busPacket->rank][busPacket->bank].nextRead &&
-					busPacket->row == bankStates[busPacket->rank][busPacket->bank].openRowAddress &&
-					rowAccessCounters[busPacket->rank][busPacket->bank] < TOTAL_ROW_ACCESSES)
-	#else
-			if (bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::RowActive &&
-					currentClockCycle >= bankStates[busPacket->rank][busPacket->bank].nextWrite &&
-					busPacket->row == bankStates[busPacket->rank][busPacket->bank].openRowAddress &&
-					rowAccessCounters[busPacket->rank][busPacket->bank] < TOTAL_ROW_ACCESSES)
-	#endif
+				currentClockCycle >= bankStates[busPacket->rank][busPacket->bank].nextWrite &&
+				busPacket->row == bankStates[busPacket->rank][busPacket->bank].openRowAddress &&
+				rowAccessCounters[busPacket->rank][busPacket->bank] < TOTAL_ROW_ACCESSES)
 			{
 				return true;
 			}
@@ -666,6 +659,9 @@ namespace DRAMSim
 				return false;
 			}
 			break;
+#ifdef DATA_RELIABILITY_ICDP
+		case BusPacket::PRE_READ:
+#endif
 		case BusPacket::READ_P:
 		case BusPacket::READ:
 			if (bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::RowActive &&

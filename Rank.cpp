@@ -76,11 +76,14 @@ namespace DRAMSim
 
 		switch (packet->busPacketType)
 		{
+#ifdef DATA_RELIABILITY_ICDP
+		case BusPacket::PRE_READ:
+#endif
 		case BusPacket::READ:
 			//make sure a read is allowed
 			if (bankStates[packet->bank].currentBankState != BankState::RowActive ||
-					currentClockCycle < bankStates[packet->bank].nextRead ||
-					packet->row != bankStates[packet->bank].openRowAddress)
+				currentClockCycle < bankStates[packet->bank].nextRead ||
+				packet->row != bankStates[packet->bank].openRowAddress)
 			{
 				packet->print();
 				ERROR("== Error - Rank " << id << " received a READ when not allowed");
@@ -92,20 +95,30 @@ namespace DRAMSim
 			for (size_t i=0;i<NUM_BANKS;i++)
 			{
 				bankStates[i].nextRead = max(bankStates[i].nextRead, currentClockCycle + max(tCCD, BL/2));
-				bankStates[i].nextWrite = max(bankStates[i].nextWrite, currentClockCycle + READ_TO_WRITE_DELAY);
+				bankStates[i].nextWrite = max(bankStates[i].nextWrite, currentClockCycle + 0);
 			}
 
 			//get the read data and put it in the storage which delays until the appropriate time (RL)
 #ifdef DATA_STORAGE
+	#ifdef DATA_RELIABILITY_ICDP
+			banks[packet->bank].READ(packet);
+	#else
 			banks[packet->bank].read(packet);
+	#endif
 	#ifdef DATA_RELIABILITY
-			if (packet->DATA_CHECK()==false)
-				if(packet->DATA_CORRECTION()==false)
+			if (packet->DATA_CHECK() > 0)
+				if(packet->DATA_CORRECTION() != 0)
 					PRINT("CAN'T FIX DATA ERROR!");
 			packet->DATA_DECODE();
 	#endif
 #else
 			packet->busPacketType = BusPacket::DATA;
+#endif
+
+
+#ifdef DATA_RELIABILITY_ICDP
+			//ICDP PRE_READ DATA
+			if (packet->busPacketType == BusPacket::REG_DATA) break;
 #endif
 			readReturnPacket.push_back(packet);
 			readReturnCountdown.push_back(RL);
@@ -132,10 +145,14 @@ namespace DRAMSim
 
 			//get the read data and put it in the storage which delays until the appropriate time (RL)
 #ifdef DATA_STORAGE
+	#ifdef DATA_RELIABILITY_ICDP
+			banks[packet->bank].READ(packet);
+	#else
 			banks[packet->bank].read(packet);
+	#endif
 	#ifdef DATA_RELIABILITY
-			if (packet->DATA_CHECK()==false)
-				if(packet->DATA_CORRECTION()==false)
+			if (packet->DATA_CHECK() > 0)
+				if(packet->DATA_CORRECTION() != 0)
 					PRINT("CAN'T FIX DATA ERROR!");
 			packet->DATA_DECODE();
 	#endif
@@ -143,30 +160,14 @@ namespace DRAMSim
 			packet->busPacketType = BusPacket::DATA;
 #endif
 
+			//ICDP PPE-READ
+			if (packet->physicalAddress == 0) break;
+
 			readReturnPacket.push_back(packet);
 			readReturnCountdown.push_back(RL);
 			break;
 		case BusPacket::WRITE:
 			//make sure a write is allowed
-#ifdef DATA_RELIABILITY_CHIPKILL_SSR
-			//make sure a pre-read is allowed
-			if (bankStates[packet->bank].currentBankState != BankState::RowActive ||
-					currentClockCycle < bankStates[packet->bank].nextRead ||
-					packet->row != bankStates[packet->bank].openRowAddress)
-			{
-				packet->print();
-				ERROR("== Error - Rank " << id << " received a Pre-READ-Then-Write when not allowed");
-				exit(0);
-			}
-
-			//update state table
-			bankStates[packet->bank].nextPrecharge = max(bankStates[packet->bank].nextPrecharge, currentClockCycle + READ_TO_WRITE_DELAY + WRITE_TO_PRE_DELAY);
-			for (size_t i=0;i<NUM_BANKS;i++)
-			{
-				bankStates[i].nextRead = max(bankStates[i].nextRead, currentClockCycle + READ_TO_WRITE_DELAY + WRITE_TO_READ_DELAY_B);
-				bankStates[i].nextWrite = max(bankStates[i].nextWrite, currentClockCycle + READ_TO_WRITE_DELAY + max(BL/2, tCCD));
-			}
-#else
 			if (bankStates[packet->bank].currentBankState != BankState::RowActive ||
 					currentClockCycle < bankStates[packet->bank].nextWrite ||
 					packet->row != bankStates[packet->bank].openRowAddress)
@@ -183,7 +184,6 @@ namespace DRAMSim
 				bankStates[i].nextRead = max(bankStates[i].nextRead, currentClockCycle + WRITE_TO_READ_DELAY_B);
 				bankStates[i].nextWrite = max(bankStates[i].nextWrite, currentClockCycle + max(BL/2, tCCD));
 			}
-#endif
 
 			//take note of where data is going when it arrives
 			incomingWriteBank = packet->bank;
@@ -192,24 +192,6 @@ namespace DRAMSim
 			delete(packet);
 			break;
 		case BusPacket::WRITE_P:
-#ifdef DATA_RELIABILITY_CHIPKILL_SSR
-			//make sure a pre-read is allowed
-			if (bankStates[packet->bank].currentBankState != BankState::RowActive ||
-					currentClockCycle < bankStates[packet->bank].nextRead ||
-					packet->row != bankStates[packet->bank].openRowAddress)
-			{
-				ERROR("== Error - Rank " << id << " received a Pre-READ-Then-WRITE_P when not allowed");
-				exit(-1);
-			}
-
-			//update state table
-			bankStates[packet->bank].nextPrecharge = max(bankStates[packet->bank].nextPrecharge, currentClockCycle + READ_TO_WRITE_DELAY + WRITE_AUTOPRE_DELAY);
-			for (size_t i=0;i<NUM_BANKS;i++)
-			{
-				bankStates[i].nextRead = max(bankStates[i].nextRead, currentClockCycle + READ_TO_WRITE_DELAY + WRITE_TO_READ_DELAY_B);
-				bankStates[i].nextWrite = max(bankStates[i].nextWrite, currentClockCycle + READ_TO_WRITE_DELAY + max(BL/2, tCCD));
-			}
-#else
 			//make sure a write is allowed
 			if (bankStates[packet->bank].currentBankState != BankState::RowActive ||
 					currentClockCycle < bankStates[packet->bank].nextWrite ||
@@ -227,7 +209,6 @@ namespace DRAMSim
 				bankStates[i].nextWrite = max(bankStates[i].nextWrite, currentClockCycle + max(tCCD, BL/2));
 				bankStates[i].nextRead = max(bankStates[i].nextRead, currentClockCycle + WRITE_TO_READ_DELAY_B);
 			}
-#endif
 
 			//take note of where data is going when it arrives
 			incomingWriteBank = packet->bank;
@@ -311,23 +292,18 @@ namespace DRAMSim
 					exit(0);
 				}
 			*/
-#ifdef DATA_STORAGE
-	#ifdef DATA_RELIABILITY
-		#ifdef DATA_RELIABILITY_CHIPKILL_SSR
-			packet->ssrData = new BusPacket(BusPacket::DATA,
-											 packet->rank,
-											 packet->bank,
-											 packet->row,
-											 packet->column,
-											 packet->physicalAddress,
-											 NULL,
-											 LEN_DEF);
-			banks[packet->bank].read(packet->ssrData);
+
+	#ifdef DATA_STORAGE
+		#ifdef DATA_RELIABILITY
+				packet->DATA_ENCODE();
 		#endif
-			packet->DATA_ENCODE();
+		#ifdef DATA_RELIABILITY_ICDP
+				banks[packet->bank].WRITE(packet);
+		#else
+				banks[packet->bank].write(packet);
+		#endif
 	#endif
-			banks[packet->bank].write(packet);
-#endif
+
 			delete(packet);
 			break;
 		default:

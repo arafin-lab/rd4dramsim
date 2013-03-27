@@ -172,6 +172,7 @@ namespace DRAMSim
 	extern unsigned NUM_COLS;
 	extern unsigned DEVICE_WIDTH;
 
+	extern unsigned CLOCK_RATIO;
 
 	//in nanoseconds
 	extern unsigned REFRESH_PERIOD;

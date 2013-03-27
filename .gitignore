@@ -11,6 +11,14 @@
 *.la
 *.a
 
+# Others
+*.dop
+*.doppo
+.cproject
+.project
+language.settings.xml
+
+
 # folder
 /traces/*
 /result/

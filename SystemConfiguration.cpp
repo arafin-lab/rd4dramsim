@@ -19,6 +19,7 @@ namespace DRAMSim
 
 
 	// device timing
+	unsigned CLOCK_RATIO;
 	unsigned REFRESH_PERIOD;
 	float tCK;
 	float Vdd;

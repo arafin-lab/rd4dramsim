@@ -55,6 +55,8 @@ namespace DRAMSim
 #ifdef DATA_RELIABILITY_ICDP
 			,PRE_READ
 			,REG_DATA
+			,ICDP_WRITE
+			,ICDP_WRITE_P
 #endif
 		} BusPacketType;
 

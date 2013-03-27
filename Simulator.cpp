@@ -65,7 +65,7 @@ namespace DRAMSim
 		// Initialize the ClockDomainCrosser to use the CPU speed
 		// If cpuClkFreqHz == 0, then assume a 1:1 ratio (like for TraceBasedSim)
 		// set the frequency ratio to 1:1
-		initClockDomain(4);
+		initClockDomain(CLOCK_RATIO);
 		PRINT("DRAMSim2 Clock Frequency ="<<clockDomainDRAM->clock<<"Hz, CPU Clock Frequency="<<clockDomainCPU->clock<<"Hz");
 
 	}

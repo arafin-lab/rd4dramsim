@@ -660,6 +660,20 @@ namespace DRAMSim
 			}
 			break;
 #ifdef DATA_RELIABILITY_ICDP
+		case BusPacket::ICDP_WRITE:
+		case BusPacket::ICDP_WRITE_P:
+			if (bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::RowActive &&
+				currentClockCycle >= bankStates[busPacket->rank][busPacket->bank].nextRead &&
+				busPacket->row == bankStates[busPacket->rank][busPacket->bank].openRowAddress &&
+				rowAccessCounters[busPacket->rank][busPacket->bank] < TOTAL_ROW_ACCESSES)
+			{
+				return true;
+			}
+			else
+			{
+				return false;
+			}
+			break;
 		case BusPacket::PRE_READ:
 #endif
 		case BusPacket::READ_P:

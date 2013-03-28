@@ -21,7 +21,7 @@ language.settings.xml
 
 # folder
 /traces/*
-/result/
+/results/
 
 # special cases
 !/traces/traceParse.py

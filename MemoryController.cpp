@@ -347,19 +347,18 @@ namespace DRAMSim
 				{
 					PRINT(" ++ Adding ICDP_WRITE/ICDP_WIRTE_P energy to total energy");
 				}
-				unsigned l = (len>8-len)?(8-len):len;
-				burstEnergy[rank] += (IDD4R - IDD3N) * BL/2 * l);
+				burstEnergy[rank] += (IDD4R - IDD3N) * BL/2 * ((len>8-len)?(8-len):len);
 				burstEnergy[rank] += (IDD4W - IDD3N) * BL/2 * len;
 
 				if (poppedBusPacket->busPacketType == BusPacket::ICDP_WRITE_P)
 				{
-					bankStates[rank][bank].nextActivate = max(currentClockCycle + READ_TO_WRITE_DELAY + WRITE_AUTOPRE_DELAY, bankStates[rank][bank].nextActivate);
+					bankStates[rank][bank].nextActivate = max(currentClockCycle + READ_TO_WRITE_DELAY - BL/2 + WRITE_AUTOPRE_DELAY, bankStates[rank][bank].nextActivate);
 					bankStates[rank][bank].lastCommand = BusPacket::WRITE_P;
-					bankStates[rank][bank].stateChangeCountdown = READ_TO_WRITE_DELAY + WRITE_TO_PRE_DELAY;
+					bankStates[rank][bank].stateChangeCountdown = READ_TO_WRITE_DELAY -BL/2 + WRITE_TO_PRE_DELAY;
 				}
 				else if (poppedBusPacket->busPacketType == BusPacket::ICDP_WRITE)
 				{
-					bankStates[rank][bank].nextPrecharge = max(currentClockCycle + READ_TO_WRITE_DELAY + WRITE_TO_PRE_DELAY, bankStates[rank][bank].nextPrecharge);
+					bankStates[rank][bank].nextPrecharge = max(currentClockCycle + READ_TO_WRITE_DELAY -BL/2 + WRITE_TO_PRE_DELAY, bankStates[rank][bank].nextPrecharge);
 					bankStates[rank][bank].lastCommand = BusPacket::WRITE;
 				}
 
@@ -371,14 +370,14 @@ namespace DRAMSim
 						{
 							if (bankStates[i][j].currentBankState == BankState::RowActive)
 							{
-								bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY + BL/2 + tRTRS, bankStates[i][j].nextWrite);
-								bankStates[i][j].nextRead = max(currentClockCycle + READ_TO_WRITE_DELAY + WRITE_TO_READ_DELAY_R, bankStates[i][j].nextRead);
+								bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY -BL/2 + BL/2 + tRTRS, bankStates[i][j].nextWrite);
+								bankStates[i][j].nextRead = max(currentClockCycle + READ_TO_WRITE_DELAY -BL/2 + WRITE_TO_READ_DELAY_R, bankStates[i][j].nextRead);
 							}
 						}
 						else
 						{
-							bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY + max(BL/2, tCCD), bankStates[i][j].nextWrite);
-							bankStates[i][j].nextRead = max(currentClockCycle + READ_TO_WRITE_DELAY + WRITE_TO_READ_DELAY_B, bankStates[i][j].nextRead);
+							bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY -BL/2 + max(BL/2, tCCD), bankStates[i][j].nextWrite);
+							bankStates[i][j].nextRead = max(currentClockCycle + READ_TO_WRITE_DELAY -BL/2 + WRITE_TO_READ_DELAY_B, bankStates[i][j].nextRead);
 						}
 					}
 				}

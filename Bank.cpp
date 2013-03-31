@@ -32,14 +32,32 @@
 
 #include "Bank.h"
 #include "BusPacket.h"
-#include <string.h> // for memcpy
-#include <assert.h>
+#include <cstring> // for memcpy
+#include <cassert>
+#include <cstdlib>
+#include <cmath>
+
 
 
 namespace DRAMSim
 {
 	using namespace std;
 
+	int Bank::Possion(long double Lambda)
+	{
+	    int k = 0;
+	    long double l=exp(-Lambda);
+	    long double u=(long double)(rand())/RAND_MAX;
+	    long double F=l;
+
+	    while (u>=F)
+	    {
+	      ++k;
+	      l=l*(long double)Lambda/k;
+	      F+=l;
+	    }
+	    return k;
+	}
 
 	int Bank::READ(BusPacket *busPacket)
 	{
@@ -47,13 +65,14 @@ namespace DRAMSim
 		{
 			busPacket->busPacketType = BusPacket::DATA;
 		}
-#ifdef ICDP_PRE_WRITE
+#ifdef ICDP_PRE_READ
 		else
 		{
 				busPacket->busPacketType = BusPacket::REG_DATA;
 		}
 #endif
-		return 0;
+		int error=Possion(busPacket->len*SUBRANK_DATA_BYTES*8*(long double)(SER_SBU_RATE));
+		return error;
 	}
 
 	int Bank::WRITE(BusPacket *busPacket)

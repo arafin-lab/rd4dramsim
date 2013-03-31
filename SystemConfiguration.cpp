@@ -17,9 +17,10 @@ namespace DRAMSim
 	unsigned NUM_DEVICES;
 	unsigned DEVICE_WIDTH;
 
-
-	// device timing
 	unsigned CLOCK_RATIO;
+	float SER_SBU_RATE;
+	// device timing
+
 	unsigned REFRESH_PERIOD;
 	float tCK;
 	float Vdd;

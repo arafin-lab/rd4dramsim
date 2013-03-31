@@ -49,6 +49,7 @@ namespace DRAMSim
 		int READ(BusPacket *busPacket);
 		int WRITE(BusPacket *busPacket);
 
+		int Possion(long double);
 
 		//fields
 		BankState currentState;

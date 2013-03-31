@@ -954,6 +954,9 @@ namespace DRAMSim
 					totalReadsPerBank[SEQUENTIAL(i,j)] = 0;
 					totalWritesPerBank[SEQUENTIAL(i,j)] = 0;
 					totalEpochLatency[SEQUENTIAL(i,j)] = 0;
+
+					errorStat.errorPerBank[SEQUENTIAL(i,j)] = 0;
+					errorStat.recoveryPerBank[SEQUENTIAL(i,j)] = 0;
 				}
 
 				burstEnergy[i] = 0;
@@ -962,6 +965,9 @@ namespace DRAMSim
 				backgroundEnergy[i] = 0;
 				totalReadsPerRank[i] = 0;
 				totalWritesPerRank[i] = 0;
+
+				errorStat.errorPerBank[i]=0;
+				errorStat.recoveryPerRank[i]=0;
 			}
 		}
 	}
@@ -1051,6 +1057,9 @@ namespace DRAMSim
 				totalReadsPerRank[i] += totalReadsPerBank[SEQUENTIAL(i,j)];
 				totalWritesPerRank[i] += totalWritesPerBank[SEQUENTIAL(i,j)];
 
+				errorStat.errorPerRank[i] += errorStat.errorPerBank[SEQUENTIAL(i,j)];
+				errorStat.recoveryPerRank[i] += errorStat.recoveryPerBank[SEQUENTIAL(i,j)];
+
 				grandTotalBankAccesses[SEQUENTIAL(i,j)] += totalReadsPerBank[SEQUENTIAL(i,j)] + totalWritesPerBank[SEQUENTIAL(i,j)];
 			}
 		}
@@ -1089,9 +1098,18 @@ namespace DRAMSim
 			PRINT( " ("<<totalReadsPerRank[r] * TRANS_DATA_BYTES<<" bytes)");
 			PRINTN( "        -Writes : " << totalWritesPerRank[r]);
 			PRINT( " ("<<totalWritesPerRank[r] * TRANS_DATA_BYTES<<" bytes)");
+
+			PRINT( "        -Faults   : " << errorStat.errorPerRank[r]);
+			//PRINT( " ("<<totalReadsPerRank[r] * TRANS_DATA_BYTES<<" bytes)");
+			PRINT( "        -Recovery : " << errorStat.recoveryPerRank[r]);
+			//PRINT( " ("<<totalWritesPerRank[r] * TRANS_DATA_BYTES<<" bytes)");
+			PRINT( "        -Recovery Rate : " << errorStat.recoveryPerRank[r]/errorStat.errorPerRank[r]);
+
 			for (size_t j=0;j<NUM_BANKS;j++)
 			{
-				PRINT( "      -Bandwidth / Latency  (Bank " <<j<<"): " <<bandwidth[SEQUENTIAL(r,j)] << " GB/s\t" <<averageLatency[SEQUENTIAL(r,j)] << " ns");
+				PRINTN( "      -Bandwidth / Latency / Fault / Recovery (Bank " <<j<<"): ");
+				PRINTN(bandwidth[SEQUENTIAL(r,j)] << " GB/s\t" <<averageLatency[SEQUENTIAL(r,j)] << " ns\t");
+				PRINT(errorStat.errorPerBank[SEQUENTIAL(r,j)] << "\t" <<errorStat.recoveryPerBank[SEQUENTIAL(r,j)]<<"\t"<<errorStat.recoveryPerBank[SEQUENTIAL(r,j)]/errorStat.errorPerBank[SEQUENTIAL(r,j)]);
 			}
 
 			double tAveLatency=0;

@@ -75,6 +75,25 @@ namespace DRAMSim
 		vector< uint64_t > actpreEnergy;
 		vector< uint64_t > refreshEnergy;
 
+		struct ErrorStat
+		{
+			ErrorStat ()
+			{
+				totalError=0;
+				errorPerBank = vector<uint64_t>(NUM_RANKS*NUM_BANKS,0);
+				recoveryPerBank = vector<uint64_t>(NUM_RANKS*NUM_BANKS,0);
+				errorPerRank = vector<uint64_t>(NUM_RANKS,0);
+				recoveryPerRank = vector<uint64_t>(NUM_RANKS,0);
+			}
+
+			uint64_t totalError;
+			vector<uint64_t> grandTotalError;
+			vector<uint64_t> errorPerBank;
+			vector<uint64_t> recoveryPerBank;
+			vector<uint64_t> errorPerRank;
+			vector<uint64_t> recoveryPerRank;
+		} errorStat;
+
 	private:
 		MemorySystem *parentMemorySystem;
 		vector<Rank *> *ranks;

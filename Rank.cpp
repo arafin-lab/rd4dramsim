@@ -32,6 +32,7 @@
 #include "MemoryController.h"
 #include "Simulator.h"
 
+#define SEQUENTIAL(rank,bank) (rank*NUM_BANKS)+bank
 
 namespace DRAMSim
 {
@@ -63,6 +64,7 @@ namespace DRAMSim
 	void Rank::receiveFromBus(BusPacket *packet)
 	{
 		const uint64_t currentClockCycle = Simulator::clockDomainDRAM->clockcycle;
+		int error;
 
 		if (DEBUG_BUS)
 		{
@@ -191,7 +193,12 @@ namespace DRAMSim
 			packet->DATA_DECODE();
 	#endif
 #else
-			packet->busPacketType = BusPacket::DATA;
+			error=banks[packet->bank].READ(packet);
+			if (error>0)
+			{
+				cout<<error<<"-bit fault occurs AT 0x"<<hex<<packet->physicalAddress<<dec<<" WHEN clock="<<Simulator::clockDomainCPU->clockcycle<<endl;
+			}
+			memoryController->errorStat.errorPerBank[SEQUENTIAL(packet->rank,packet->bank)]+=error;
 #endif
 			readReturnPacket.push_back(packet);
 			readReturnCountdown.push_back(RL);
@@ -230,7 +237,12 @@ namespace DRAMSim
 			packet->DATA_DECODE();
 	#endif
 #else
-			packet->busPacketType = BusPacket::DATA;
+			error=banks[packet->bank].READ(packet);
+			if (error>0)
+			{
+				cout<<error<<"-bit fault occurs AT 0x"<<hex<<packet->physicalAddress<<dec<<" WHEN clock="<<Simulator::clockDomainCPU->clockcycle<<endl;
+			}
+			memoryController->errorStat.errorPerBank[SEQUENTIAL(packet->rank,packet->bank)]+=error;
 #endif
 
 			readReturnPacket.push_back(packet);

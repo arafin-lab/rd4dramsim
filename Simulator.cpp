@@ -10,6 +10,7 @@
 #include "Callback.h"
 #include "ClockDomain.h"
 #include "Transaction.h"
+#include <ctime>
 
 
 namespace DRAMSim
@@ -67,6 +68,8 @@ namespace DRAMSim
 		// set the frequency ratio to 1:1
 		initClockDomain(CLOCK_RATIO);
 		PRINT("DRAMSim2 Clock Frequency ="<<clockDomainDRAM->clock<<"Hz, CPU Clock Frequency="<<clockDomainCPU->clock<<"Hz");
+
+		srand((unsigned)time(NULL));
 
 	}
 

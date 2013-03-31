@@ -176,6 +176,7 @@ namespace DRAMSim
 	extern unsigned DEVICE_WIDTH;
 
 	extern unsigned CLOCK_RATIO;
+	extern float SER_SBU_RATE;
 
 	//in nanoseconds
 	extern unsigned REFRESH_PERIOD;

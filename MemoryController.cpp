@@ -295,6 +295,7 @@ namespace DRAMSim
 			switch (poppedBusPacket->busPacketType)
 			{
 	#ifdef DATA_RELIABILITY_ICDP
+	#ifdef ICDP_PRE_READ
 			case BusPacket::PRE_READ:
 				bankStates[rank][bank].preReadState = true;
 				//TODO: calculate power for reliable operations
@@ -330,7 +331,8 @@ namespace DRAMSim
 				}
 				cmdStat.prereadCounter++;
 			break;
-
+	#endif
+	#ifdef ICDP_LONG_WRITE
 			case BusPacket::ICDP_WRITE_P:
 			case BusPacket::ICDP_WRITE:
 				//TODO: calculate power for reliable operations
@@ -391,6 +393,7 @@ namespace DRAMSim
 				cmdStat.prereadCounter++;
 
 			break;
+	#endif
 	#endif
 
 			case BusPacket::READ_P:

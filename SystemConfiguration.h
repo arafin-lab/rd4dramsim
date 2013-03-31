@@ -57,7 +57,7 @@
 
 //#define DATA_RELIABILITY_ECC
 //#define DATA_RELIABILITY_CHIPKILL
-#define DATA_RELIABILITY_ICDP
+//#define DATA_RELIABILITY_ICDP
 
 #ifdef DATA_RELIABILITY_ECC
 	#define DATA_STORAGE
@@ -100,8 +100,8 @@
 
 
 #ifdef DATA_RELIABILITY_ICDP
-	//#define ICDP_LONG_WRITE
-	#define ICDP_PRE_READ
+	#define ICDP_LONG_WRITE
+	//#define ICDP_PRE_READ
 	#define DATA_STORAGE_SSR
 	#define DATA_STORAGE
 	#define DATA_RELIABILITY
@@ -156,6 +156,7 @@ namespace DRAMSim
 
 	extern bool DEBUG_INI_READER;
 
+	extern bool DEBUG_TRANS_LATENCY;
 	extern bool DEBUG_TRANS_Q;
 	extern bool DEBUG_CMD_Q;
 	extern bool DEBUG_ADDR_MAP;

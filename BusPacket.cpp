@@ -137,15 +137,19 @@ namespace DRAMSim
 				PRINT("BP [READ_P] pa[0x"<<hex<<physicalAddress<<dec<<"] r["<<rank<<"] b["<<bank<<"] row["<<row<<"] col["<<column<<"]");
 				break;
 #ifdef DATA_RELIABILITY_ICDP
+	#ifdef ICDP_PRE_READ
 			case PRE_READ:
 				PRINT("BP [PRE_READ] pa[0x"<<hex<<physicalAddress<<dec<<"] r["<<rank<<"] b["<<bank<<"] row["<<row<<"] col["<<column<<"]");
 				break;
+	#endif
+	#ifdef ICDP_LONG_WRITE
 			case ICDP_WRITE:
 				PRINT("BP [ICDP_WRITE] pa[0x"<<hex<<physicalAddress<<dec<<"] r["<<rank<<"] b["<<bank<<"] row["<<row<<"] col["<<column<<"]");
 				break;
 			case ICDP_WRITE_P:
 				PRINT("BP [ICDP_WRITE_P] pa[0x"<<hex<<physicalAddress<<dec<<"] r["<<rank<<"] b["<<bank<<"] row["<<row<<"] col["<<column<<"]");
 				break;
+	#endif
 #endif
 			case WRITE:
 				PRINT("BP [WRITE] pa[0x"<<hex<<physicalAddress<<dec<<"] r["<<rank<<"] b["<<bank<<"] row["<<row<<"] col["<<column<<"]");

@@ -276,10 +276,11 @@ namespace DRAMSim
 									if (i>0 && queue[i-1]->busPacketType==BusPacket::ACTIVATE &&
 											   queue[i-1]->physicalAddress == queue[i]->physicalAddress)
 										continue;
-
+								#ifdef ICDP_PRE_READ
 									if (i>2 && queue[i]->busPacketType==BusPacket::WRITE &&
 											   queue[i-2]->busPacketType==BusPacket::PRE_READ)
 										continue;
+								#endif
 
 									*busPacket = queue[i];
 									queue.erase(queue.begin()+i);
@@ -672,6 +673,7 @@ namespace DRAMSim
 			}
 			break;
 #ifdef DATA_RELIABILITY_ICDP
+	#ifdef ICDP_LONG_WRITE
 		case BusPacket::ICDP_WRITE:
 		case BusPacket::ICDP_WRITE_P:
 			if (bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::RowActive &&
@@ -686,7 +688,10 @@ namespace DRAMSim
 				return false;
 			}
 			break;
+	#endif
+	#ifdef ICDP_PRE_READ
 		case BusPacket::PRE_READ:
+	#endif
 #endif
 		case BusPacket::READ_P:
 		case BusPacket::READ:

@@ -77,6 +77,7 @@ namespace DRAMSim
 		switch (packet->busPacketType)
 		{
 #ifdef DATA_RELIABILITY_ICDP
+	#ifdef ICDP_LONG_WRITE
 		case BusPacket::ICDP_WRITE:
 			//make sure a write is allowed
 			if (bankStates[packet->bank].currentBankState != BankState::RowActive ||
@@ -127,7 +128,8 @@ namespace DRAMSim
 			incomingWriteColumn = packet->column;
 			delete(packet);
 			break;
-
+	#endif
+	#ifdef ICDP_PRE_READ
 		case BusPacket::PRE_READ:
 			//make sure a read is allowed
 			if (bankStates[packet->bank].currentBankState != BankState::RowActive ||
@@ -154,6 +156,7 @@ namespace DRAMSim
 					PRINT("CAN'T FIX DATA ERROR!");
 			packet->DATA_DECODE();
 			break;
+	#endif
 #endif
 		case BusPacket::READ:
 			//make sure a read is allowed

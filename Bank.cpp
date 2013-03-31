@@ -47,7 +47,7 @@ namespace DRAMSim
 		{
 			busPacket->busPacketType = BusPacket::DATA;
 		}
-#ifdef DATA_RELIABILITY_ICDP
+#ifdef ICDP_PRE_WRITE
 		else
 		{
 				busPacket->busPacketType = BusPacket::REG_DATA;

@@ -53,10 +53,14 @@ namespace DRAMSim
 			REFRESH,
 			DATA
 #ifdef DATA_RELIABILITY_ICDP
+	#ifdef ICDP_PRE_READ
 			,PRE_READ
 			,REG_DATA
+	#endif
+	#ifdef ICDP_LONG_WRITE
 			,ICDP_WRITE
 			,ICDP_WRITE_P
+	#endif
 #endif
 		} BusPacketType;
 

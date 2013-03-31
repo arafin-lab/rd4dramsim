@@ -129,6 +129,31 @@ namespace DRAMSim
 			break;
 
 		case BusPacket::PRE_READ:
+			//make sure a read is allowed
+			if (bankStates[packet->bank].currentBankState != BankState::RowActive ||
+				currentClockCycle < bankStates[packet->bank].nextRead ||
+				packet->row != bankStates[packet->bank].openRowAddress)
+			{
+				packet->print();
+				ERROR("== Error - Rank " << id << " received a PRE-READ when not allowed");
+				exit(0);
+			}
+
+			//update state table
+			bankStates[packet->bank].nextPrecharge = max(bankStates[packet->bank].nextPrecharge, currentClockCycle + READ_TO_WRITE_DELAY + READ_TO_PRE_DELAY);
+			for (size_t i=0;i<NUM_BANKS;i++)
+			{
+				bankStates[i].nextRead = max(bankStates[i].nextRead, currentClockCycle + READ_TO_WRITE_DELAY - BL/2);
+				bankStates[i].nextWrite = max(bankStates[i].nextWrite, currentClockCycle + READ_TO_WRITE_DELAY - BL/2);
+			}
+
+			//get the read data and put it in the storage which delays until the appropriate time (RL)
+			banks[packet->bank].READ(packet);
+			if (packet->DATA_CHECK() > 0)
+				if(packet->DATA_CORRECTION() != 0)
+					PRINT("CAN'T FIX DATA ERROR!");
+			packet->DATA_DECODE();
+			break;
 #endif
 		case BusPacket::READ:
 			//make sure a read is allowed
@@ -146,7 +171,7 @@ namespace DRAMSim
 			for (size_t i=0;i<NUM_BANKS;i++)
 			{
 				bankStates[i].nextRead = max(bankStates[i].nextRead, currentClockCycle + max(tCCD, BL/2));
-				bankStates[i].nextWrite = max(bankStates[i].nextWrite, currentClockCycle + 0);
+				bankStates[i].nextWrite = max(bankStates[i].nextWrite, currentClockCycle + READ_TO_WRITE_DELAY);
 			}
 
 			//get the read data and put it in the storage which delays until the appropriate time (RL)
@@ -164,12 +189,6 @@ namespace DRAMSim
 	#endif
 #else
 			packet->busPacketType = BusPacket::DATA;
-#endif
-
-
-#ifdef DATA_RELIABILITY_ICDP
-			//ICDP PRE_READ DATA
-			if (packet->busPacketType == BusPacket::REG_DATA) break;
 #endif
 			readReturnPacket.push_back(packet);
 			readReturnCountdown.push_back(RL);
@@ -210,9 +229,6 @@ namespace DRAMSim
 #else
 			packet->busPacketType = BusPacket::DATA;
 #endif
-
-			//ICDP PPE-READ
-			if (packet->physicalAddress == 0) break;
 
 			readReturnPacket.push_back(packet);
 			readReturnCountdown.push_back(RL);

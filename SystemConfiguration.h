@@ -100,7 +100,8 @@
 
 
 #ifdef DATA_RELIABILITY_ICDP
-	#define ICDP_LONG_WRITE
+	//#define ICDP_LONG_WRITE
+	#define ICDP_PRE_READ
 	#define DATA_STORAGE_SSR
 	#define DATA_STORAGE
 	#define DATA_RELIABILITY

@@ -277,6 +277,10 @@ namespace DRAMSim
 											   queue[i-1]->physicalAddress == queue[i]->physicalAddress)
 										continue;
 
+									if (i>2 && queue[i]->busPacketType==BusPacket::WRITE &&
+											   queue[i-2]->busPacketType==BusPacket::PRE_READ)
+										continue;
+
 									*busPacket = queue[i];
 									queue.erase(queue.begin()+i);
 									foundIssuable = true;
@@ -636,7 +640,11 @@ namespace DRAMSim
 			if ((bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::Idle ||
 					bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::Refreshing) &&
 					currentClockCycle >= bankStates[busPacket->rank][busPacket->bank].nextActivate &&
-					tFAWCountdown[busPacket->rank].size() < 4)
+					tFAWCountdown[busPacket->rank].size() < 4
+	#ifdef ICDP_PRE_READ
+				&& bankStates[busPacket->rank][busPacket->bank].preReadState == false
+	#endif
+				)
 			{
 				return true;
 			}
@@ -650,7 +658,11 @@ namespace DRAMSim
 			if (bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::RowActive &&
 				currentClockCycle >= bankStates[busPacket->rank][busPacket->bank].nextWrite &&
 				busPacket->row == bankStates[busPacket->rank][busPacket->bank].openRowAddress &&
-				rowAccessCounters[busPacket->rank][busPacket->bank] < TOTAL_ROW_ACCESSES)
+				rowAccessCounters[busPacket->rank][busPacket->bank] < TOTAL_ROW_ACCESSES
+	#ifdef ICDP_PRE_READ
+				&& bankStates[busPacket->rank][busPacket->bank].preReadState == true
+	#endif
+				)
 			{
 				return true;
 			}
@@ -681,7 +693,11 @@ namespace DRAMSim
 			if (bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::RowActive &&
 					currentClockCycle >= bankStates[busPacket->rank][busPacket->bank].nextRead &&
 					busPacket->row == bankStates[busPacket->rank][busPacket->bank].openRowAddress &&
-					rowAccessCounters[busPacket->rank][busPacket->bank] < TOTAL_ROW_ACCESSES)
+					rowAccessCounters[busPacket->rank][busPacket->bank] < TOTAL_ROW_ACCESSES
+	#ifdef ICDP_PRE_READ
+					&& bankStates[busPacket->rank][busPacket->bank].preReadState == false
+	#endif
+				)
 			{
 				return true;
 			}
@@ -692,7 +708,11 @@ namespace DRAMSim
 			break;
 		case BusPacket::PRECHARGE:
 			if (bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::RowActive &&
-					currentClockCycle >= bankStates[busPacket->rank][busPacket->bank].nextPrecharge)
+					currentClockCycle >= bankStates[busPacket->rank][busPacket->bank].nextPrecharge
+	#ifdef ICDP_PRE_READ
+				&& bankStates[busPacket->rank][busPacket->bank].preReadState == false
+	#endif
+				)
 			{
 				return true;
 			}

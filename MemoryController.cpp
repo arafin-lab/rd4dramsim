@@ -266,7 +266,7 @@ namespace DRAMSim
 		if (commandQueue.pop(&poppedBusPacket))
 		{
 			if (poppedBusPacket->busPacketType == BusPacket::WRITE || poppedBusPacket->busPacketType == BusPacket::WRITE_P
-		#ifdef DATA_RELIABILITY_ICDP
+		#ifdef ICDP_LONG_WRITE
 			||  poppedBusPacket->busPacketType == BusPacket::ICDP_WRITE || poppedBusPacket->busPacketType == BusPacket::ICDP_WRITE_P
 		#endif
 			)
@@ -296,6 +296,7 @@ namespace DRAMSim
 			{
 	#ifdef DATA_RELIABILITY_ICDP
 			case BusPacket::PRE_READ:
+				bankStates[rank][bank].preReadState = true;
 				//TODO: calculate power for reliable operations
 				//add energy to account for total
 				if (DEBUG_POWER)
@@ -304,9 +305,8 @@ namespace DRAMSim
 				}
 				burstEnergy[rank] += (IDD4R - IDD3N) * BL/2 * len;
 
-				bankStates[rank][bank].nextActivate = max(currentClockCycle + READ_TO_WRITE_DELAY + 1, bankStates[rank][bank].nextActivate);
-				bankStates[rank][bank].nextPrecharge = max(currentClockCycle + READ_TO_WRITE_DELAY + 1, bankStates[rank][bank].nextPrecharge);
-				bankStates[rank][bank].lastCommand = BusPacket::READ;
+				//update state table
+				bankStates[rank][bank].nextPrecharge = max(bankStates[rank][bank].nextPrecharge, currentClockCycle + READ_TO_WRITE_DELAY + READ_TO_PRE_DELAY);
 
 				for (size_t i=0;i<NUM_RANKS;i++)
 				{
@@ -317,22 +317,14 @@ namespace DRAMSim
 							//check to make sure it is active before trying to set (save's time?)
 							if (bankStates[i][j].currentBankState == BankState::RowActive)
 							{
-								bankStates[i][j].nextRead = max(currentClockCycle + READ_TO_WRITE_DELAY + 1, bankStates[i][j].nextRead);
-								bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY + 1, bankStates[i][j].nextWrite);
+								bankStates[i][j].nextRead = max(currentClockCycle + READ_TO_WRITE_DELAY - BL/2, bankStates[i][j].nextRead);
+								bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY - BL/2, bankStates[i][j].nextWrite);
 							}
 						}
 						else
 						{
-							if (j==poppedBusPacket->bank)
-							{
-								bankStates[i][j].nextRead = max(currentClockCycle + READ_TO_WRITE_DELAY + 1, bankStates[i][j].nextRead);
-								bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY, bankStates[i][j].nextWrite);
-							}
-							else
-							{
-								bankStates[i][j].nextRead = max(currentClockCycle + READ_TO_WRITE_DELAY + 1, bankStates[i][j].nextRead);
-								bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY + 1, bankStates[i][j].nextWrite);
-							}
+							bankStates[i][j].nextRead = max(currentClockCycle + READ_TO_WRITE_DELAY - BL/2, bankStates[i][j].nextRead);
+							bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY - BL/2, bankStates[i][j].nextWrite);
 						}
 					}
 				}
@@ -463,6 +455,9 @@ namespace DRAMSim
 
 			case BusPacket::WRITE_P:
 			case BusPacket::WRITE:
+	#ifdef ICDP_PRE_READ
+				bankStates[rank][bank].preReadState = false;
+	#endif
 				if (poppedBusPacket->busPacketType == BusPacket::WRITE_P)
 				{
 					bankStates[rank][bank].nextActivate = max(currentClockCycle + WRITE_AUTOPRE_DELAY, bankStates[rank][bank].nextActivate);
@@ -474,7 +469,6 @@ namespace DRAMSim
 					bankStates[rank][bank].nextPrecharge = max(currentClockCycle + WRITE_TO_PRE_DELAY, bankStates[rank][bank].nextPrecharge);
 					bankStates[rank][bank].lastCommand = BusPacket::WRITE;
 				}
-
 
 				//add energy to account for total
 				if (DEBUG_POWER)
@@ -654,7 +648,7 @@ namespace DRAMSim
 				transactionQueue.erase(transactionQueue.begin()+i);
 
 				//create PRE_READ command when write
-	#ifdef DATA_RELIABILITY_ICDP
+	#ifdef ICDP_PRE_READ
 				if (bpType == BusPacket::WRITE || bpType == BusPacket::WRITE_P)
 				{
 

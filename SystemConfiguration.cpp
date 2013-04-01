@@ -82,6 +82,7 @@ namespace DRAMSim
 	QueuingStructure queuingStructure;
 
 
+	bool DEBUG_FAULT_INJECTION;
 	bool DEBUG_TRANS_LATENCY;
 	bool DEBUG_TRANS_Q;
 	bool DEBUG_CMD_Q;

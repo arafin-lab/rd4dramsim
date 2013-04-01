@@ -65,6 +65,9 @@ namespace DRAMSim
 		void update();
 		void printStats(bool finalStats = false);
 
+		long double PossionCumulativeEXP(int k,long double lambda);
+		long double PossionCumulative(int k,long double lambda);
+
 
 		//fields
 		vector<Transaction *> transactionQueue;

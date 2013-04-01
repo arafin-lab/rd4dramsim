@@ -39,12 +39,15 @@
 #include "MemorySystem.h"
 #include "SimulatorIO.h"
 #include "Simulator.h"
+#include <iomanip>
 
 #define SEQUENTIAL(rank,bank) (rank*NUM_BANKS)+bank
 
 namespace DRAMSim
 {
 	using namespace std;
+
+
 
 	MemoryController::MemoryController(MemorySystem *parent, vector<Rank *> *ranks, unsigned channel) :
 			parentMemorySystem(parent),
@@ -794,6 +797,7 @@ namespace DRAMSim
 				{
 					PRINT(" ++ Adding IDD3N to total energy [from rank "<< i <<"]");
 				}
+				//TODO:multi-rank ???
 				backgroundEnergy[i] += IDD3N * NUM_DEVICES;
 			}
 			else
@@ -1092,7 +1096,6 @@ namespace DRAMSim
 		double totalAggregateBandwidth = 0.0;
 		for (size_t r=0;r<NUM_RANKS;r++)
 		{
-
 			PRINT( "    -Rank   "<<r<<" : ");
 			PRINTN( "        -Reads  : " << totalReadsPerRank[r]);
 			PRINT( " ("<<totalReadsPerRank[r] * TRANS_DATA_BYTES<<" bytes)");
@@ -1103,13 +1106,27 @@ namespace DRAMSim
 			//PRINT( " ("<<totalReadsPerRank[r] * TRANS_DATA_BYTES<<" bytes)");
 			PRINT( "        -Recovery : " << errorStat.recoveryPerRank[r]);
 			//PRINT( " ("<<totalWritesPerRank[r] * TRANS_DATA_BYTES<<" bytes)");
-			PRINT( "        -Recovery Rate : " << errorStat.recoveryPerRank[r]/errorStat.errorPerRank[r]);
+
+			long double recoveryRate=1;
+			if(errorStat.errorPerRank[r]>0)
+			{
+				recoveryRate=(long double)errorStat.recoveryPerRank[r]/errorStat.errorPerRank[r];
+				PRINT( "        -Recovery Rate : " <<recoveryRate*100<<"%");
+			}
 
 			for (size_t j=0;j<NUM_BANKS;j++)
 			{
 				PRINTN( "      -Bandwidth / Latency / Fault / Recovery (Bank " <<j<<"): ");
 				PRINTN(bandwidth[SEQUENTIAL(r,j)] << " GB/s\t" <<averageLatency[SEQUENTIAL(r,j)] << " ns\t");
-				PRINT(errorStat.errorPerBank[SEQUENTIAL(r,j)] << "\t" <<errorStat.recoveryPerBank[SEQUENTIAL(r,j)]<<"\t"<<errorStat.recoveryPerBank[SEQUENTIAL(r,j)]/errorStat.errorPerBank[SEQUENTIAL(r,j)]);
+				if(errorStat.errorPerBank[SEQUENTIAL(r,j)]>0)
+				{
+					PRINTN(errorStat.errorPerBank[SEQUENTIAL(r,j)] << "\t" <<errorStat.recoveryPerBank[SEQUENTIAL(r,j)]<<"\t");
+					PRINT((double)errorStat.recoveryPerBank[SEQUENTIAL(r,j)]/errorStat.errorPerBank[SEQUENTIAL(r,j)]*100<<"%");
+				}
+				else
+				{
+					cout<<endl;
+				}
 			}
 
 			double tAveLatency=0;
@@ -1119,9 +1136,17 @@ namespace DRAMSim
 			}
 
 			double totalRW=cmdStat.readCounter+cmdStat.readpCounter+cmdStat.writeCounter+cmdStat.writepCounter;
+			double totalR=cmdStat.readCounter+cmdStat.readpCounter;
+			double tAveReadInterval=cyclesElapsed*tCK/totalR;
 			PRINT("      -Total    Average    Latency  :\t\t\t"<< tAveLatency/NUM_BANKS <<" ns");
 			PRINT("      -Workload Character[(clock*tck)/(Read+Write)] = \t"<< (cyclesElapsed*tCK)/totalRW <<" ns");
 
+
+			long double faultInjectionVolum=(long double)60*60*1000/tAveReadInterval*SER_SBU_RATE*TOTAL_STORAGE*8*1000000000;
+			long double unrepairedFaultVolum=faultInjectionVolum-recoveryRate*faultInjectionVolum;
+
+			PRINT("      -Total Fault-Injection   Volum = \t"<<faultInjectionVolum<<" FIT/Mbit");
+			PRINT("      -Total Unrepaired-Faults Volum = \t"<<unrepairedFaultVolum<<" FIT/Mbit");
 
 			// factor of 1000 at the end is to account for the fact that totalEnergy is accumulated in mJ since IDD values are given in mA
 			backgroundPower[r] = ((double)backgroundEnergy[r] / (double)(cyclesElapsed)) * Vdd / 1000.0;
@@ -1241,6 +1266,33 @@ namespace DRAMSim
 		totalEpochLatency[SEQUENTIAL(rank,bank)] += latencyValue;
 		//poor man's way to bin things.
 		latencies[(latencyValue/HISTOGRAM_BIN_SIZE)*HISTOGRAM_BIN_SIZE]++;
+	}
+
+
+	long double MemoryController::PossionCumulativeEXP(int k,long double lambda)
+	{
+	    long double l=exp(-lambda);
+	    long double F = 0;
+
+	    for(int i=1;i<k+1;i++)
+	    {
+	      l=l*(long double)lambda/k;
+	      F+=l*i;
+	    }
+	    return F;
+	}
+
+	long double MemoryController::PossionCumulative(int k,long double lambda)
+	{
+	    long double l=exp(-lambda);
+	    long double F = l;
+
+	    for(int i=1;i<k+1;i++)
+	    {
+	      l=l*(long double)lambda/k;
+	      F+=l;
+	    }
+	    return F;
 	}
 
 } // end of namespace DRAMSim

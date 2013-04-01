@@ -223,64 +223,72 @@ namespace DRAMSim
 	{
 
 #ifdef DATA_RELIABILITY_CHIPKILL
-		CHIPKILL(DECODE);
+		//CHIPKILL(DECODE);
 #endif
 
 #ifdef DATA_RELIABILITY_ECC
-		ECC_HAMMING_SECDED(DECODE);
+		//ECC_HAMMING_SECDED(DECODE);
 #endif
 
 
 #ifdef DATA_RELIABILITY_ICDP
-		ICDP(DECODE);
+		//ICDP(DECODE);
 #endif
 	}
 
-	int BusPacket::DATA_CHECK()
+	int BusPacket::DATA_CHECK(int error=0)
 	{
 		int result;
 
 #ifdef DATA_RELIABILITY_CHIPKILL
-		CHIPKILL(DECODE);
+		//CHIPKILL(DECODE);
 #endif
 
 #ifdef DATA_RELIABILITY_ECC
-		result = ECC_HAMMING_SECDED(CHECK);
+		//result = ECC_HAMMING_SECDED(CHECK);
 #endif
 
 #ifdef DATA_RELIABILITY_CHIPKILL
-		CHIPKILL(ENCODE);
+		//CHIPKILL(ENCODE);
 #endif
 
 
 #ifdef DATA_RELIABILITY_ICDP
-		result = ICDP(CHECK);
+		//result = ICDP(CHECK);
 #endif
+		result = error;
 
 		return result;
 	}
 
-	int BusPacket::DATA_CORRECTION()
+	int BusPacket::DATA_CORRECTION(int error=0)
 	{
 		int result;
 
 #ifdef DATA_RELIABILITY_CHIPKILL
-		CHIPKILL(DECODE);
+		//CHIPKILL(DECODE);
 #endif
 
 #ifdef DATA_RELIABILITY_ECC
-		result = ECC_HAMMING_SECDED(CORRECTION);
+		//result = ECC_HAMMING_SECDED(CORRECTION);
 #endif
 
 #ifdef DATA_RELIABILITY_CHIPKILL
-		CHIPKILL(ENCODE);
+		//CHIPKILL(ENCODE);
 #endif
 
 
 #ifdef DATA_RELIABILITY_ICDP
-		result = ICDP(CORRECTION);
+		//result = ICDP(CORRECTION);
 #endif
-
+		if (error < FT_BITS + 1)
+		{
+			result=0;
+		}
+		else
+		{
+			result=error;
+		}
 		return result;
 	}
 

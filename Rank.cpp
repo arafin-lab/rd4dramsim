@@ -181,23 +181,26 @@ namespace DRAMSim
 
 			//get the read data and put it in the storage which delays until the appropriate time (RL)
 #ifdef DATA_STORAGE
-	#ifdef DATA_RELIABILITY_ICDP
-			banks[packet->bank].READ(packet);
-	#else
-			banks[packet->bank].read(packet);
-	#endif
 	#ifdef DATA_RELIABILITY
-			if (packet->DATA_CHECK() > 0)
-				if(packet->DATA_CORRECTION() != 0)
-					PRINT("CAN'T FIX DATA ERROR!");
+			error=banks[packet->bank].READ(packet);
+			memoryController->errorStat.errorPerBank[SEQUENTIAL(packet->rank,packet->bank)]+=error;
+			if (packet->DATA_CHECK(error) > 0)
+				if(packet->DATA_CORRECTION(error) == 0)
+				{
+					if (DEBUG_FAULT_INJECTION==true)
+					{
+						cout<<"Repair Fault AT 0x"<<hex<<packet->physicalAddress<<dec<<endl;
+					}
+					memoryController->errorStat.recoveryPerBank[SEQUENTIAL(packet->rank,packet->bank)] += error;
+				}
+				else if (DEBUG_FAULT_INJECTION==true)
+				{
+					cout<<"Can't Repair Fault AT 0x"<<hex<<packet->physicalAddress<<dec<<endl;
+				}
 			packet->DATA_DECODE();
 	#endif
 #else
 			error=banks[packet->bank].READ(packet);
-			if (error>0)
-			{
-				cout<<error<<"-bit fault occurs AT 0x"<<hex<<packet->physicalAddress<<dec<<" WHEN clock="<<Simulator::clockDomainCPU->clockcycle<<endl;
-			}
 			memoryController->errorStat.errorPerBank[SEQUENTIAL(packet->rank,packet->bank)]+=error;
 #endif
 			readReturnPacket.push_back(packet);
@@ -225,23 +228,23 @@ namespace DRAMSim
 
 			//get the read data and put it in the storage which delays until the appropriate time (RL)
 #ifdef DATA_STORAGE
-	#ifdef DATA_RELIABILITY_ICDP
-			banks[packet->bank].READ(packet);
-	#else
-			banks[packet->bank].read(packet);
-	#endif
 	#ifdef DATA_RELIABILITY
-			if (packet->DATA_CHECK() > 0)
-				if(packet->DATA_CORRECTION() != 0)
-					PRINT("CAN'T FIX DATA ERROR!");
+			error=banks[packet->bank].READ(packet);
+			memoryController->errorStat.errorPerBank[SEQUENTIAL(packet->rank,packet->bank)]+=error;
+			if (packet->DATA_CHECK(error) > 0)
+				if(packet->DATA_CORRECTION(error) == 0)
+				{
+					cout<<error<<"Repair Fault AT 0x"<<hex<<packet->physicalAddress<<dec<<endl;
+					memoryController->errorStat.recoveryPerBank[SEQUENTIAL(packet->rank,packet->bank)]+=error;
+				}
+				else
+				{
+					cout<<error<<"Can't Repair Fault AT 0x"<<hex<<packet->physicalAddress<<dec<<endl;
+				}
 			packet->DATA_DECODE();
 	#endif
 #else
 			error=banks[packet->bank].READ(packet);
-			if (error>0)
-			{
-				cout<<error<<"-bit fault occurs AT 0x"<<hex<<packet->physicalAddress<<dec<<" WHEN clock="<<Simulator::clockDomainCPU->clockcycle<<endl;
-			}
 			memoryController->errorStat.errorPerBank[SEQUENTIAL(packet->rank,packet->bank)]+=error;
 #endif
 

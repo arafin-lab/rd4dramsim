@@ -56,7 +56,7 @@
 //#define DATA_RELIABILITY
 
 //#define DATA_RELIABILITY_ECC
-//#define DATA_RELIABILITY_CHIPKILL
+#define DATA_RELIABILITY_CHIPKILL
 //#define DATA_RELIABILITY_ICDP
 
 #ifdef DATA_RELIABILITY_ECC
@@ -67,7 +67,9 @@
 	#define ECC_WORD_BITS 8
 	#define TOTAL_WORD_BITS 72
 
+	#define FT_BITS 1
 	#define LEN_DEF 8
+
 	#define BUS_DATA_BITS 64
 	#define BUS_ECC_BITS 8
 	#define BUS_TOTAL_BITS 72
@@ -83,6 +85,7 @@
 	#define DATA_RELIABILITY
 	#define DATA_RELIABILITY_ECC
 
+	#define FT_BITS 32
 	#define LEN_DEF 36
 
 	#define DATA_WORD_BITS 64
@@ -106,6 +109,7 @@
 	#define DATA_STORAGE
 	#define DATA_RELIABILITY
 
+	#define FT_BITS 64
 	#define LEN_DEF 10
 
 	#define DATA_WORD_BITS 64
@@ -133,6 +137,7 @@
 
 //default value without reliability design
 #ifndef DATA_RELIABILITY
+	#define FT_BITS 0
 	#define BUS_DATA_BITS 64
 	#define BUS_TOTAL_BITS 64
 	#define TRANS_DATA_BYTES 64
@@ -156,6 +161,7 @@ namespace DRAMSim
 
 	extern bool DEBUG_INI_READER;
 
+	extern bool DEBUG_FAULT_INJECTION;
 	extern bool DEBUG_TRANS_LATENCY;
 	extern bool DEBUG_TRANS_Q;
 	extern bool DEBUG_CMD_Q;

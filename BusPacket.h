@@ -101,8 +101,8 @@ namespace DRAMSim
 		void DATA_ENCODE();
 		void DATA_DECODE();
 
-		int DATA_CHECK();
-		int DATA_CORRECTION();
+		int DATA_CHECK(int error);
+		int DATA_CORRECTION(int error);
 
 
 	#ifdef DATA_RELIABILITY_ICDP

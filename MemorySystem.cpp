@@ -65,7 +65,7 @@ namespace DRAMSim
 			PRINT("CH. " <<iChannel
 				  <<" TOTAL_STORAGE : "<< TOTAL_STORAGE<< "MB | "
 				  << NUM_RANKS <<" Ranks | "
-				  << NUM_DEVICES/NUM_RANKS <<" Devices per rank | "
+				  << NUM_DEVICES/NUM_RANKS/NUM_CHANS <<" Devices per rank | "
 				  << DEVICE_WIDTH << " Bits per device");
 		}
 	}

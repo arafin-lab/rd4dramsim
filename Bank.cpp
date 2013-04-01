@@ -32,6 +32,7 @@
 
 #include "Bank.h"
 #include "BusPacket.h"
+#include "Simulator.h"
 #include <cstring> // for memcpy
 #include <cassert>
 #include <cstdlib>
@@ -71,7 +72,12 @@ namespace DRAMSim
 				busPacket->busPacketType = BusPacket::REG_DATA;
 		}
 #endif
-		int error=Possion(busPacket->len*SUBRANK_DATA_BYTES*8*(long double)(SER_SBU_RATE));
+		int error=0;
+		error = Possion(busPacket->len*SUBRANK_DATA_BYTES*8*(long double)(SER_SBU_RATE));
+		if (DEBUG_FAULT_INJECTION == true && error>0)
+		{
+			cout<<error<<"-bit fault occurs AT 0x"<<hex<<busPacket->physicalAddress<<dec<<" WHEN clock="<<Simulator::clockDomainCPU->clockcycle<<endl;
+		}
 		return error;
 	}
 

@@ -83,7 +83,7 @@ public:
     void update();
 
     int issueInstr(InstrType instrType, uint64_t maddr=0);
-	void retireMemInstr(Transaction tran);
+	void retireMemInstr(Transaction *tran);
 	Transaction* generateTransaction(unsigned long addr, unsigned gran, Transaction::TransactionType type);
 
 	bool isTraceOver() {return (reach_eof == 1);}

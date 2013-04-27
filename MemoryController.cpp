@@ -860,8 +860,12 @@ namespace DRAMSim
 						(*parentMemorySystem->ReadDataDone)(channelID, pendingReadTransactions[i]->address, Simulator::clockDomainCPU->clockcycle);
 					}
 
+                    Simulator::rob[pendingReadTransactions[i]->threadID]->retireMemInstr(pendingReadTransactions[i]);
+
 					delete pendingReadTransactions[i];
 					pendingReadTransactions.erase(pendingReadTransactions.begin()+i);
+
+
 					foundMatch=true;
 					break;
 				}

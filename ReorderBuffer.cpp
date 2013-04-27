@@ -625,13 +625,13 @@ int ReorderBuffer::issueInstr(InstrType instrType, uint64_t maddr)
     	return 1;
 }
 
-void ReorderBuffer::retireMemInstr(Transaction tran)
+void ReorderBuffer::retireMemInstr(Transaction *tran)
 {
 	int pos = head;
     unsigned MatchOK = 0;
 	for(unsigned i = 0; i < inflight; i++)
 	{
-		if(mem_address[pos] == tran.address)
+		if(mem_address[pos] == tran->address)
 		{
             if(comptime[pos] != 0)
             {

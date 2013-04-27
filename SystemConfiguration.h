@@ -48,7 +48,7 @@
 //SystemConfiguration.h
 //
 
-//#define MEMORYSYSTEM_BUFFER
+#define MEMORYSYSTEM_BUFFER
 
 #define RETURN_TRANSACTIONS
 //#define DATA_STORAGE
@@ -56,7 +56,7 @@
 //#define DATA_RELIABILITY
 
 //#define DATA_RELIABILITY_ECC
-#define DATA_RELIABILITY_CHIPKILL
+//#define DATA_RELIABILITY_CHIPKILL
 //#define DATA_RELIABILITY_ICDP
 
 #ifdef DATA_RELIABILITY_ECC
@@ -181,7 +181,7 @@ namespace DRAMSim
 	extern unsigned NUM_COLS;
 	extern unsigned DEVICE_WIDTH;
 
-	extern unsigned CLOCK_RATIO;
+	extern unsigned PROCESSOR_CLK_MULTIPLIER;
 	extern float SER_SBU_RATE;
 
 	//in nanoseconds
@@ -236,6 +236,30 @@ namespace DRAMSim
 	#define WRITE_AUTOPRE_DELAY (WL+BL/2+tWR+tRP)
 	#define WRITE_TO_READ_DELAY_B (WL+BL/2+tWTR) //interbank
 	#define WRITE_TO_READ_DELAY_R (WL+BL/2+tRTRS-RL) //interrank
+
+
+	extern unsigned PROCESSOR_CLK_MULTIPLIER;
+	extern unsigned NUM_THREADS;
+	extern unsigned BUS_WIDTH;
+	extern unsigned READ_BUS_WIDTH;         //WRITE_BUS_WIDTH = BUS_WIDTH - READ_BUS_WIDTH
+	extern unsigned L1_BASE_NUM;
+	extern unsigned L2_BASE_NUM;
+	extern uint64_t L1_DIFFERENCE;
+	extern uint64_t L2_DIFFERENCE;
+	extern unsigned JEDEC_DATA_BUS_BITS;
+	//ROB parameters
+	extern unsigned ROB_SIZE;
+	extern unsigned MAX_RETIRE;
+	extern unsigned MAX_FETCH;
+	extern unsigned PIPELINE_DEPTH;
+	#define BIG_LATENCY 10000000U
+	//Cache access latency
+	extern unsigned NON_MEM_LATENCY;
+	extern unsigned L1_CACHE_HIT_LATENCY;
+	extern unsigned L2_CACHE_HIT_LATENCY;
+	extern unsigned L3_CACHE_HIT_LATENCY;
+	extern unsigned ALL_CACHE_MISS_LATENCY;
+
 
 	//Memory Controller related parameters
 	extern unsigned TRANS_QUEUE_DEPTH;

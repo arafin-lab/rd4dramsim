@@ -21,7 +21,7 @@ namespace DRAMSim
 	ClockDomain* Simulator::clockDomainCPU = NULL;
 	ClockDomain* Simulator::clockDomainDRAM = NULL;
 	ClockDomain* Simulator::clockDomainTREE = NULL;
-
+	ReorderBuffer * Simulator::rob[100];
 
 	Simulator::~Simulator()
 	{
@@ -43,6 +43,17 @@ namespace DRAMSim
 		simIO->initOutputFiles();
 
 		memorySystem= new MemorySystem();
+/*
+		MemorySystem *ms = NULL;
+		bussystem = new Bus(ms, NULL);
+		mc = new MemoryController(ms, NULL, bussystem, rob,0);
+	    cout<<"new MC OK!"<<endl;
+		for(int i = 0; i < NUM_MODULES; i++)
+		{
+			mm[i] = new MemoryModule(i+1, NULL, bussystem, ms);
+		}
+*/
+	    cout<<"new MS OK!"<<endl;
 
 #ifdef RETURN_TRANSACTIONS
 		transReceiver = new TransactionReceiver;
@@ -66,10 +77,22 @@ namespace DRAMSim
 		// Initialize the ClockDomainCrosser to use the CPU speed
 		// If cpuClkFreqHz == 0, then assume a 1:1 ratio (like for TraceBasedSim)
 		// set the frequency ratio to 1:1
-		initClockDomain(CLOCK_RATIO);
+		initClockDomain(PROCESSOR_CLK_MULTIPLIER);
 		PRINT("DRAMSim2 Clock Frequency ="<<clockDomainDRAM->clock<<"Hz, CPU Clock Frequency="<<clockDomainCPU->clock<<"Hz");
 
 		srand((unsigned)time(NULL));
+
+
+		for(unsigned i = 0; i < NUM_THREADS; i++)
+		{
+			stringstream numStr;
+			numStr<<i;
+			rob[i] = new ReorderBuffer(i, simIO->traceFilename+numStr.str(), this);
+		}
+	    cout<<"new ROB OK!"<<endl;
+
+
+
 
 	}
 
@@ -101,29 +124,28 @@ namespace DRAMSim
 	}
 
 
-
 	void Simulator::update()
 	{
-		if (trans == NULL)
+		pendingTrace = false;
+		for(unsigned i = 0; i < NUM_THREADS; i++)
 		{
-			trans = simIO->nextTrans();
-			if (trans == NULL)
-			{
-				pendingTrace = false;
-				return;
-			}
+			rob[i]->update();
+			if (rob[i]->isTraceOver() == false) pendingTrace = true;
 		}
+	}
 
-		if ( clockDomainCPU->clockcycle >= trans->timeTraced)
+	bool Simulator::addTransaction(Transaction *generated_trans)
+	{
+		if(memorySystem->addTransaction(generated_trans))
 		{
-			if(memorySystem->addTransaction(trans))
-			{
 #ifdef RETURN_TRANSACTIONS
-				transReceiver->addPending(trans, clockDomainCPU->clockcycle);
+			transReceiver->addPending(generated_trans, clockDomainCPU->clockcycle);
 #endif
-				// the memory system accepted our request so now it takes ownership of it
-				trans=NULL;
-			}
+			return true;
+		}
+		else
+		{
+			return false;
 		}
 	}
 

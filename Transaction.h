@@ -43,8 +43,6 @@
 #include <list>
 
 
-
-
 namespace DRAMSim
 {
 
@@ -52,8 +50,8 @@ namespace DRAMSim
 
 	class Transaction
 	{
-		Transaction();
 	public:
+		Transaction();
 		typedef enum
 		{
 			DATA_READ,
@@ -70,6 +68,25 @@ namespace DRAMSim
 		uint64_t timeReturned;
 		uint64_t timeTraced;
 
+		/////// clc add: module_id to indicates the memory module it would access  ///////////
+		uint64_t transactionID;   ///< the ID of each transaction
+
+		int memory_module_id;
+		uint64_t timeSended;     //sended to the target memory module through bus
+		uint64_t timeArrived;  ///< arrive at the targeted memory module, put into its command queue
+	    uint64_t timeScheduled;            ///< col read cmd scheduled by the buffer scheduler, send commands to DRAM     uint64_t timeActiveScheduled;
+	    uint64_t timeReturnToBufferScheduler;   ///< read data return to buffer scheduler, just for read requests
+		/////// ~end clc added
+
+		unsigned threadID;
+
+		/// wangyn add:		///
+		bool readDone;
+		bool scheduling;
+		uint64_t subCommandID;		///< the ID of the command that was put in the data buffer
+		unsigned subDRAMCommandCount;	///< the amount of DRAM command that one item in the data buffer was devided into has returned
+		/// ~end wangyn added	///
+
 		//functions
 		Transaction(TransactionType transType, uint64_t addr, DataPacket *data, size_t len=TRANS_DATA_BYTES/SUBRANK_DATA_BYTES, uint64_t time = 0);
 		Transaction(const Transaction &t);
@@ -77,11 +94,19 @@ namespace DRAMSim
 		void alignAddress();
 		BusPacket::BusPacketType getBusPacketType();
 
+		/// clc add:    ///
+		void setTimeSended(uint64_t sendedTime){ timeSended = sendedTime; }
+		void setTimeArrived(uint64_t ArrivedMMTime) { timeArrived = ArrivedMMTime;}
+		void setTimeScheduled(uint64_t scheduledTime) { timeScheduled = scheduledTime; }
+		void setTimeReturnToBufferScheduler(uint64_t returnBSTime){timeReturnToBufferScheduler = returnBSTime;}
+		/// ~end clc added
+
 		void print();
 	};
 
 
 #ifdef RETURN_TRANSACTIONS
+
 	class TransactionReceiver
 	{
 		private:
@@ -92,86 +117,12 @@ namespace DRAMSim
 		public:
 			TransactionReceiver():counter(0){};
 
-			void addPending(const Transaction *t, uint64_t cycle)
-			{
-				// C++ lists are ordered, so the list will always push to the back and
-				// remove at the front to ensure ordering
-				if (t->transactionType == Transaction::DATA_READ)
-				{
-					pendingReadRequests[t->address].push_back(cycle);
-				}
-				else if (t->transactionType == Transaction::DATA_WRITE)
-				{
-					pendingWriteRequests[t->address].push_back(cycle);
-				}
-				else
-				{
-					ERROR("This should never happen");
-					exit(-1);
-				}
-				counter++;
-			}
+			void addPending(const Transaction *t, uint64_t cycle);
+			void read_complete(unsigned id, uint64_t address, uint64_t done_cycle);
+			void write_complete(unsigned id, uint64_t address, uint64_t done_cycle);
 
-			void read_complete(unsigned id, uint64_t address, uint64_t done_cycle)
-			{
-				map<uint64_t, list<uint64_t> >::iterator it;
-				it = pendingReadRequests.find(address);
-				if (it == pendingReadRequests.end())
-				{
-					ERROR("Cant find a pending read for this one");
-					exit(-1);
-				}
-				else
-				{
-					if (it->second.size() == 0)
-					{
-						ERROR("Nothing here, either");
-						exit(-1);
-					}
-				}
-				if (DEBUG_TRANS_LATENCY == true)
-				{
-					uint64_t added_cycle = pendingReadRequests[address].front();
-					uint64_t latency = (done_cycle - added_cycle);
+			bool pendingTrans();
 
-					pendingReadRequests[address].pop_front();
-					cout << "Read Callback:  0x"<< std::hex << address << std::dec << " latency="<<latency<<"cycles ("<< done_cycle<< "->"<<added_cycle<<")"<<endl;
-				}
-				counter--;
-			}
-
-			void write_complete(unsigned id, uint64_t address, uint64_t done_cycle)
-			{
-				map<uint64_t, list<uint64_t> >::iterator it;
-				it = pendingWriteRequests.find(address);
-				if (it == pendingWriteRequests.end())
-				{
-					ERROR("Cant find a pending read for this one");
-					exit(-1);
-				}
-				else
-				{
-					if (it->second.size() == 0)
-					{
-						ERROR("Nothing here, either");
-						exit(-1);
-					}
-				}
-				if (DEBUG_TRANS_LATENCY == true)
-				{
-					uint64_t added_cycle = pendingWriteRequests[address].front();
-					uint64_t latency = done_cycle - added_cycle;
-
-					pendingWriteRequests[address].pop_front();
-					cout << "Write Callback: 0x"<< std::hex << address << std::dec << " latency="<<latency<<"cycles ("<< done_cycle<< "->"<<added_cycle<<")"<<endl;
-				}
-				counter--;
-			}
-
-			bool pendingTrans()
-			{
-				return (counter==0)?false:true;
-			}
 	};
 #endif
 

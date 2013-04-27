@@ -107,6 +107,10 @@ namespace DRAMSim
 		{
 			traceType = DGpin;
 		}
+		else if (temp == "cache" || temp == "mem")
+		{
+			PRINT("MMA Trace");
+		}
 		else
 		{
 			ERROR("== Unknown Tracefile Type : "<<temp);
@@ -299,6 +303,7 @@ namespace DRAMSim
 
 
 		DEBUG("== Loading trace file '"<<traceFilename<<"' == ");
+		/*
 		traceFile.open(traceFilename.c_str());
 
 		if (!traceFile.is_open())
@@ -306,6 +311,7 @@ namespace DRAMSim
 			cout << "== Error - Could not open trace file"<<endl;
 			exit(0);
 		}
+		*/
 
 		PRINT("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
 

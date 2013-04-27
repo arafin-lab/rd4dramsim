@@ -17,7 +17,7 @@ namespace DRAMSim
 	unsigned NUM_DEVICES;
 	unsigned DEVICE_WIDTH;
 
-	unsigned CLOCK_RATIO;
+	unsigned PROCESSOR_CLK_MULTIPLIER;
 	float SER_SBU_RATE;
 	// device timing
 
@@ -57,6 +57,28 @@ namespace DRAMSim
 	unsigned IDD6;
 	unsigned IDD6L;
 	unsigned IDD7;
+
+
+	//in bytes
+	unsigned NUM_THREADS;
+	unsigned BUS_WIDTH;
+	unsigned READ_BUS_WIDTH;
+	unsigned L1_BASE_NUM;
+	unsigned L2_BASE_NUM;
+	uint64_t L1_DIFFERENCE;
+	uint64_t L2_DIFFERENCE;
+	unsigned JEDEC_DATA_BUS_BITS;
+
+	//ROB parameters
+	unsigned ROB_SIZE = 256;
+	unsigned MAX_RETIRE = 2;
+	unsigned MAX_FETCH = 4;
+	unsigned PIPELINE_DEPTH = 5;
+	unsigned NON_MEM_LATENCY = PIPELINE_DEPTH;
+	unsigned L1_CACHE_HIT_LATENCY = 4;
+	unsigned L2_CACHE_HIT_LATENCY = 10;
+	unsigned L3_CACHE_HIT_LATENCY = 40;
+	unsigned ALL_CACHE_MISS_LATENCY = BIG_LATENCY;
 
 
 	//Memory Controller parameters

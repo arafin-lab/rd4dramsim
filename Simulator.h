@@ -4,6 +4,7 @@
 #include "SimulatorIO.h"
 #include "ClockDomain.h"
 #include "MemorySystem.h"
+#include "ReorderBuffer.h"
 
 
 namespace DRAMSim
@@ -19,9 +20,16 @@ namespace DRAMSim
 		void update();
 		void report();
 
+		bool addTransaction(Transaction *trans);
+
 		static ClockDomain* clockDomainCPU;
 		static ClockDomain* clockDomainDRAM;
 		static ClockDomain* clockDomainTREE;
+
+		static ReorderBuffer *rob[100];
+	#ifdef RETURN_TRANSACTIONS
+		TransactionReceiver *transReceiver;
+	#endif
 
 	private:
 		void initClockDomain(double clockRatio);
@@ -31,11 +39,10 @@ namespace DRAMSim
 		MemorySystem *memorySystem;
 		Transaction *trans;
 
+
 		bool pendingTrace;
 
-#ifdef RETURN_TRANSACTIONS
-		TransactionReceiver *transReceiver;
-#endif
+
 
 	};
 }

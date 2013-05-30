@@ -1,32 +1,32 @@
 /*********************************************************************************
-*  Copyright (c) 2010-2011, Elliott Cooper-Balis
-*                             Paul Rosenfeld
-*                             Bruce Jacob
-*                             University of Maryland 
-*                             dramninjas [at] gmail [dot] com
-*  All rights reserved.
-*  
-*  Redistribution and use in source and binary forms, with or without
-*  modification, are permitted provided that the following conditions are met:
-*  
-*     * Redistributions of source code must retain the above copyright notice,
-*        this list of conditions and the following disclaimer.
-*  
-*     * Redistributions in binary form must reproduce the above copyright notice,
-*        this list of conditions and the following disclaimer in the documentation
-*        and/or other materials provided with the distribution.
-*  
-*  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-*  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-*  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-*  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-*  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-*  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-*  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-*  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-*  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-*  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*********************************************************************************/
+ *  Copyright (c) 2010-2011, Elliott Cooper-Balis
+ *                             Paul Rosenfeld
+ *                             Bruce Jacob
+ *                             University of Maryland 
+ *                             dramninjas [at] gmail [dot] com
+ *  All rights reserved.
+ *  
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions are met:
+ *  
+ *     * Redistributions of source code must retain the above copyright notice,
+ *        this list of conditions and the following disclaimer.
+ *  
+ *     * Redistributions in binary form must reproduce the above copyright notice,
+ *        this list of conditions and the following disclaimer in the documentation
+ *        and/or other materials provided with the distribution.
+ *  
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ *  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ *  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ *  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ *  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ *  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ *  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *********************************************************************************/
 
 
 
@@ -39,7 +39,7 @@
 #include "MemorySystem.h"
 #include "SimulatorIO.h"
 #include "Simulator.h"
-#include <iomanip>
+#include "CacheSimulator.h"
 
 #define SEQUENTIAL(rank,bank) (rank*NUM_BANKS)+bank
 
@@ -47,18 +47,16 @@ namespace DRAMSim
 {
 	using namespace std;
 
-
-
 	MemoryController::MemoryController(MemorySystem *parent, vector<Rank *> *ranks, unsigned channel) :
-			parentMemorySystem(parent),
-			ranks(ranks),
-			bankStates(NUM_RANKS, vector<BankState>(NUM_BANKS)),
-			commandQueue(bankStates),
-			poppedBusPacket(NULL),
-			totalTransactions(0),
-			refreshRank(0),
-			csvOut(SimulatorIO::verifyFile),
-			channelID(channel)
+		parentMemorySystem(parent),
+		ranks(ranks),
+		bankStates(NUM_RANKS, vector<BankState>(NUM_BANKS)),
+		commandQueue(bankStates),
+		poppedBusPacket(NULL),
+		totalTransactions(0),
+		refreshRank(0),
+		csvOut(SimulatorIO::verifyFile),
+		channelID(channel)
 	{
 		//bus related fields
 		outgoingCmdPacket = NULL;
@@ -138,22 +136,19 @@ namespace DRAMSim
 						switch (bankStates[i][j].lastCommand)
 						{
 							//only these commands have an implicit state change
-		#ifdef DATA_RELIABILITY_ICDP
-						case BusPacket::ICDP_WRITE_P:
-		#endif
-						case BusPacket::WRITE_P:
-						case BusPacket::READ_P:
-							bankStates[i][j].currentBankState = BankState::Precharging;
-							bankStates[i][j].lastCommand = BusPacket::PRECHARGE;
-							bankStates[i][j].stateChangeCountdown = tRP;
-							break;
+							case BusPacket::WRITE_P:
+							case BusPacket::READ_P:
+								bankStates[i][j].currentBankState = BankState::Precharging;
+								bankStates[i][j].lastCommand = BusPacket::PRECHARGE;
+								bankStates[i][j].stateChangeCountdown = tRP;
+								break;
 
-						case BusPacket::REFRESH:
-						case BusPacket::PRECHARGE:
-							bankStates[i][j].currentBankState = BankState::Idle;
-							break;
-						default:
-							break;
+							case BusPacket::REFRESH:
+							case BusPacket::PRECHARGE:
+								bankStates[i][j].currentBankState = BankState::Idle;
+								break;
+							default:
+								break;
 						}
 					}
 				}
@@ -268,20 +263,16 @@ namespace DRAMSim
 		//function returns true if there is something valid in poppedBusPacket
 		if (commandQueue.pop(&poppedBusPacket))
 		{
-			if (poppedBusPacket->busPacketType == BusPacket::WRITE || poppedBusPacket->busPacketType == BusPacket::WRITE_P
-		#ifdef ICDP_LONG_WRITE
-			||  poppedBusPacket->busPacketType == BusPacket::ICDP_WRITE || poppedBusPacket->busPacketType == BusPacket::ICDP_WRITE_P
-		#endif
-			)
+			if (poppedBusPacket->busPacketType == BusPacket::WRITE || poppedBusPacket->busPacketType == BusPacket::WRITE_P)
 			{
 				BusPacket *bpWrite=new BusPacket(BusPacket::DATA,
-												 poppedBusPacket->rank,
-												 poppedBusPacket->bank,
-												 poppedBusPacket->row,
-												 poppedBusPacket->column,
-												 poppedBusPacket->physicalAddress,
-												 poppedBusPacket->data,
-												 poppedBusPacket->len);
+						poppedBusPacket->rank,
+						poppedBusPacket->bank,
+						poppedBusPacket->row,
+						poppedBusPacket->column,
+						poppedBusPacket->physicalAddress,
+						poppedBusPacket->data,
+						poppedBusPacket->len);
 
 				writeDataToSend.push_back(bpWrite);
 				writeDataCountdown.push_back(WL);
@@ -297,291 +288,189 @@ namespace DRAMSim
 
 			switch (poppedBusPacket->busPacketType)
 			{
-	#ifdef DATA_RELIABILITY_ICDP
-	#ifdef ICDP_PRE_READ
-			case BusPacket::PRE_READ:
-				bankStates[rank][bank].preReadState = true;
-				//TODO: calculate power for reliable operations
-				//add energy to account for total
-				if (DEBUG_POWER)
-				{
-					PRINT(" ++ Adding Read energy to total energy");
-				}
-				burstEnergy[rank] += (IDD4R - IDD3N) * BL/2 * len;
-
-				//update state table
-				bankStates[rank][bank].nextPrecharge = max(bankStates[rank][bank].nextPrecharge, currentClockCycle + READ_TO_WRITE_DELAY + READ_TO_PRE_DELAY);
-
-				for (size_t i=0;i<NUM_RANKS;i++)
-				{
-					for (size_t j=0;j<NUM_BANKS;j++)
+				case BusPacket::READ_P:
+				case BusPacket::READ:
+					//add energy to account for total
+					if (DEBUG_POWER)
 					{
-						if (i!=poppedBusPacket->rank)
+						PRINT(" ++ Adding Read energy to total energy");
+					}
+					burstEnergy[rank] += (IDD4R - IDD3N) * BL/2 * len;
+					if (poppedBusPacket->busPacketType == BusPacket::READ_P)
+					{
+						//Don't bother setting next read or write times because the bank is no longer active
+						//bankStates[rank][bank].currentBankState = Idle;
+						bankStates[rank][bank].nextActivate = max(currentClockCycle + READ_AUTOPRE_DELAY,
+								bankStates[rank][bank].nextActivate);
+						bankStates[rank][bank].lastCommand = BusPacket::READ_P;
+						bankStates[rank][bank].stateChangeCountdown = READ_TO_PRE_DELAY;
+					}
+					else if (poppedBusPacket->busPacketType == BusPacket::READ)
+					{
+						bankStates[rank][bank].nextPrecharge = max(currentClockCycle + READ_TO_PRE_DELAY,
+								bankStates[rank][bank].nextPrecharge);
+						bankStates[rank][bank].lastCommand = BusPacket::READ;
+
+					}
+
+					for (size_t i=0;i<NUM_RANKS;i++)
+					{
+						for (size_t j=0;j<NUM_BANKS;j++)
 						{
-							//check to make sure it is active before trying to set (save's time?)
-							if (bankStates[i][j].currentBankState == BankState::RowActive)
+							if (i!=poppedBusPacket->rank)
 							{
-								bankStates[i][j].nextRead = max(currentClockCycle + READ_TO_WRITE_DELAY - BL/2, bankStates[i][j].nextRead);
-								bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY - BL/2, bankStates[i][j].nextWrite);
+								//check to make sure it is active before trying to set (save's time?)
+								if (bankStates[i][j].currentBankState == BankState::RowActive)
+								{
+									bankStates[i][j].nextRead = max(currentClockCycle + BL/2 + tRTRS, bankStates[i][j].nextRead);
+									bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY,
+											bankStates[i][j].nextWrite);
+								}
+							}
+							else
+							{
+								bankStates[i][j].nextRead = max(currentClockCycle + max(tCCD, BL/2), bankStates[i][j].nextRead);
+								bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY,
+										bankStates[i][j].nextWrite);
 							}
 						}
-						else
-						{
-							bankStates[i][j].nextRead = max(currentClockCycle + READ_TO_WRITE_DELAY - BL/2, bankStates[i][j].nextRead);
-							bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY - BL/2, bankStates[i][j].nextWrite);
-						}
 					}
-				}
-				cmdStat.prereadCounter++;
-			break;
-	#endif
-	#ifdef ICDP_LONG_WRITE
-			case BusPacket::ICDP_WRITE_P:
-			case BusPacket::ICDP_WRITE:
-				//TODO: calculate power for reliable operations
-				//add energy to account for total
-				if (DEBUG_POWER)
-				{
-					PRINT(" ++ Adding ICDP_WRITE/ICDP_WIRTE_P energy to total energy");
-				}
-				burstEnergy[rank] += (IDD4R - IDD3N) * BL/2 * ((len>8-len)?(8-len):len);
-				burstEnergy[rank] += (IDD4W - IDD3N) * BL/2 * len;
 
-				if (poppedBusPacket->busPacketType == BusPacket::ICDP_WRITE_P)
-				{
-					bankStates[rank][bank].nextActivate = max(currentClockCycle + READ_TO_WRITE_DELAY - BL/2 + WRITE_AUTOPRE_DELAY, bankStates[rank][bank].nextActivate);
-					bankStates[rank][bank].lastCommand = BusPacket::WRITE_P;
-					bankStates[rank][bank].stateChangeCountdown = READ_TO_WRITE_DELAY -BL/2 + WRITE_TO_PRE_DELAY;
-				}
-				else if (poppedBusPacket->busPacketType == BusPacket::ICDP_WRITE)
-				{
-					bankStates[rank][bank].nextPrecharge = max(currentClockCycle + READ_TO_WRITE_DELAY -BL/2 + WRITE_TO_PRE_DELAY, bankStates[rank][bank].nextPrecharge);
-					bankStates[rank][bank].lastCommand = BusPacket::WRITE;
-				}
-
-				for (size_t i=0;i<NUM_RANKS;i++)
-				{
-					for (size_t j=0;j<NUM_BANKS;j++)
+					if (poppedBusPacket->busPacketType == BusPacket::READ_P)
 					{
-						if (i!=poppedBusPacket->rank)
+						//set read and write to nextActivate so the state table will prevent a read or write
+						//  being issued (in cq.isIssuable())before the bank state has been changed because of the
+						//  auto-precharge associated with this command
+						bankStates[rank][bank].nextRead = bankStates[rank][bank].nextActivate;
+						bankStates[rank][bank].nextWrite = bankStates[rank][bank].nextActivate;
+
+						cmdStat.readpCounter++;
+					}
+					else
+					{
+						cmdStat.readCounter++;
+					}
+
+					break;
+				case BusPacket::WRITE_P:
+				case BusPacket::WRITE:
+					if (poppedBusPacket->busPacketType == BusPacket::WRITE_P)
+					{
+						bankStates[rank][bank].nextActivate = max(currentClockCycle + WRITE_AUTOPRE_DELAY,
+								bankStates[rank][bank].nextActivate);
+						bankStates[rank][bank].lastCommand = BusPacket::WRITE_P;
+						bankStates[rank][bank].stateChangeCountdown = WRITE_TO_PRE_DELAY;
+					}
+					else if (poppedBusPacket->busPacketType == BusPacket::WRITE)
+					{
+						bankStates[rank][bank].nextPrecharge = max(currentClockCycle + WRITE_TO_PRE_DELAY,
+								bankStates[rank][bank].nextPrecharge);
+						bankStates[rank][bank].lastCommand = BusPacket::WRITE;
+					}
+
+
+					//add energy to account for total
+					if (DEBUG_POWER)
+					{
+						PRINT(" ++ Adding Write energy to total energy");
+					}
+					burstEnergy[rank] += (IDD4W - IDD3N) * BL/2 * len;
+
+					for (size_t i=0;i<NUM_RANKS;i++)
+					{
+						for (size_t j=0;j<NUM_BANKS;j++)
 						{
-							if (bankStates[i][j].currentBankState == BankState::RowActive)
+							if (i!=poppedBusPacket->rank)
 							{
-								bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY -BL/2 + BL/2 + tRTRS, bankStates[i][j].nextWrite);
-								bankStates[i][j].nextRead = max(currentClockCycle + READ_TO_WRITE_DELAY -BL/2 + WRITE_TO_READ_DELAY_R, bankStates[i][j].nextRead);
+								if (bankStates[i][j].currentBankState == BankState::RowActive)
+								{
+									bankStates[i][j].nextWrite = max(currentClockCycle + BL/2 + tRTRS, bankStates[i][j].nextWrite);
+									bankStates[i][j].nextRead = max(currentClockCycle + WRITE_TO_READ_DELAY_R,
+											bankStates[i][j].nextRead);
+								}
 							}
-						}
-						else
-						{
-							bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY -BL/2 + max(BL/2, tCCD), bankStates[i][j].nextWrite);
-							bankStates[i][j].nextRead = max(currentClockCycle + READ_TO_WRITE_DELAY -BL/2 + WRITE_TO_READ_DELAY_B, bankStates[i][j].nextRead);
-						}
-					}
-				}
-
-				//set read and write to nextActivate so the state table will prevent a read or write
-				//  being issued (in cq.isIssuable())before the bank state has been changed because of the
-				//  auto-precharge associated with this command
-				if (poppedBusPacket->busPacketType == BusPacket::ICDP_WRITE_P)
-				{
-					bankStates[rank][bank].nextRead = bankStates[rank][bank].nextActivate;
-					bankStates[rank][bank].nextWrite = bankStates[rank][bank].nextActivate;
-
-					cmdStat.writepCounter++;
-				}
-				else
-				{
-					cmdStat.writeCounter++;
-				}
-				cmdStat.prereadCounter++;
-
-			break;
-	#endif
-	#endif
-
-			case BusPacket::READ_P:
-			case BusPacket::READ:
-				//TODO: calculate power for reliable operations
-				//add energy to account for total
-				if (DEBUG_POWER)
-				{
-					PRINT(" ++ Adding Read energy to total energy");
-				}
-				burstEnergy[rank] += (IDD4R - IDD3N) * BL/2 * len;
-				if (poppedBusPacket->busPacketType == BusPacket::READ_P)
-				{
-					//Don't bother setting next read or write times because the bank is no longer active
-					//bankStates[rank][bank].currentBankState = Idle;
-					bankStates[rank][bank].nextActivate = max(currentClockCycle + READ_AUTOPRE_DELAY, bankStates[rank][bank].nextActivate);
-					bankStates[rank][bank].lastCommand = BusPacket::READ_P;
-					bankStates[rank][bank].stateChangeCountdown = READ_TO_PRE_DELAY;
-				}
-				else
-				{
-					bankStates[rank][bank].nextPrecharge = max(currentClockCycle + READ_TO_PRE_DELAY, bankStates[rank][bank].nextPrecharge);
-					bankStates[rank][bank].lastCommand = BusPacket::READ;
-				}
-
-				for (size_t i=0;i<NUM_RANKS;i++)
-				{
-					for (size_t j=0;j<NUM_BANKS;j++)
-					{
-						if (i!=poppedBusPacket->rank)
-						{
-							//check to make sure it is active before trying to set (save's time?)
-							if (bankStates[i][j].currentBankState == BankState::RowActive)
+							else
 							{
-								bankStates[i][j].nextRead = max(currentClockCycle + BL/2 + tRTRS, bankStates[i][j].nextRead);
-								bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY, bankStates[i][j].nextWrite);
-							}
-						}
-						else
-						{
-							bankStates[i][j].nextRead = max(currentClockCycle + max(tCCD, BL/2), bankStates[i][j].nextRead);
-							bankStates[i][j].nextWrite = max(currentClockCycle + READ_TO_WRITE_DELAY, bankStates[i][j].nextWrite);
-						}
-					}
-				}
-
-				if (poppedBusPacket->busPacketType == BusPacket::READ_P)
-				{
-					//set read and write to nextActivate so the state table will prevent a read or write
-					//  being issued (in cq.isIssuable())before the bank state has been changed because of the
-					//  auto-precharge associated with this command
-					bankStates[rank][bank].nextRead = bankStates[rank][bank].nextActivate;
-					bankStates[rank][bank].nextWrite = bankStates[rank][bank].nextActivate;
-
-					cmdStat.readpCounter++;
-				}
-				else
-				{
-					cmdStat.readCounter++;
-				}
-				break;
-
-			case BusPacket::WRITE_P:
-			case BusPacket::WRITE:
-	#ifdef ICDP_PRE_READ
-				bankStates[rank][bank].preReadState = false;
-	#endif
-				if (poppedBusPacket->busPacketType == BusPacket::WRITE_P)
-				{
-					bankStates[rank][bank].nextActivate = max(currentClockCycle + WRITE_AUTOPRE_DELAY, bankStates[rank][bank].nextActivate);
-					bankStates[rank][bank].lastCommand = BusPacket::WRITE_P;
-					bankStates[rank][bank].stateChangeCountdown = WRITE_TO_PRE_DELAY;
-				}
-				else if (poppedBusPacket->busPacketType == BusPacket::WRITE)
-				{
-					bankStates[rank][bank].nextPrecharge = max(currentClockCycle + WRITE_TO_PRE_DELAY, bankStates[rank][bank].nextPrecharge);
-					bankStates[rank][bank].lastCommand = BusPacket::WRITE;
-				}
-
-				//add energy to account for total
-				if (DEBUG_POWER)
-				{
-					PRINT(" ++ Adding Write energy to total energy");
-				}
-				burstEnergy[rank] += (IDD4W - IDD3N) * BL/2 * len;
-
-				for (size_t i=0;i<NUM_RANKS;i++)
-				{
-					for (size_t j=0;j<NUM_BANKS;j++)
-					{
-						if (i!=poppedBusPacket->rank)
-						{
-							if (bankStates[i][j].currentBankState == BankState::RowActive)
-							{
-								bankStates[i][j].nextWrite = max(currentClockCycle + BL/2 + tRTRS, bankStates[i][j].nextWrite);
-								bankStates[i][j].nextRead = max(currentClockCycle + WRITE_TO_READ_DELAY_R,
+								bankStates[i][j].nextWrite = max(currentClockCycle + max(BL/2, tCCD), bankStates[i][j].nextWrite);
+								bankStates[i][j].nextRead = max(currentClockCycle + WRITE_TO_READ_DELAY_B,
 										bankStates[i][j].nextRead);
 							}
 						}
-						else
+					}
+
+					//set read and write to nextActivate so the state table will prevent a read or write
+					//  being issued (in cq.isIssuable())before the bank state has been changed because of the
+					//  auto-precharge associated with this command
+					if (poppedBusPacket->busPacketType == BusPacket::WRITE_P)
+					{
+						bankStates[rank][bank].nextRead = bankStates[rank][bank].nextActivate;
+						bankStates[rank][bank].nextWrite = bankStates[rank][bank].nextActivate;
+
+						cmdStat.writepCounter++;
+					}
+					else
+					{
+						cmdStat.writeCounter++;
+					}
+					break;
+				case BusPacket::ACTIVATE:
+					//add energy to account for total
+					if (DEBUG_POWER)
+					{
+						PRINT(" ++ Adding Activate and Precharge energy to total energy");
+					}
+					actpreEnergy[rank] += ((IDD0 * tRC) - ((IDD3N * tRAS) + (IDD2N * (tRC - tRAS)))) * len;
+
+					bankStates[rank][bank].currentBankState = BankState::RowActive;
+					bankStates[rank][bank].lastCommand = BusPacket::ACTIVATE;
+					bankStates[rank][bank].openRowAddress = poppedBusPacket->row;
+					bankStates[rank][bank].nextActivate = max(currentClockCycle + tRC, bankStates[rank][bank].nextActivate);
+					bankStates[rank][bank].nextPrecharge = max(currentClockCycle + tRAS, bankStates[rank][bank].nextPrecharge);
+
+					//if we are using posted-CAS, the next column access can be sooner than normal operation
+
+					bankStates[rank][bank].nextRead = max(currentClockCycle + (tRCD-AL), bankStates[rank][bank].nextRead);
+					bankStates[rank][bank].nextWrite = max(currentClockCycle + (tRCD-AL), bankStates[rank][bank].nextWrite);
+
+					for (size_t i=0;i<NUM_BANKS;i++)
+					{
+						if (i!=poppedBusPacket->bank)
 						{
-							bankStates[i][j].nextWrite = max(currentClockCycle + max(BL/2, tCCD), bankStates[i][j].nextWrite);
-							bankStates[i][j].nextRead = max(currentClockCycle + WRITE_TO_READ_DELAY_B,
-									bankStates[i][j].nextRead);
+							bankStates[rank][i].nextActivate = max(currentClockCycle + tRRD, bankStates[rank][i].nextActivate);
 						}
 					}
-				}
 
-				//set read and write to nextActivate so the state table will prevent a read or write
-				//  being issued (in cq.isIssuable())before the bank state has been changed because of the
-				//  auto-precharge associated with this command
-				if (poppedBusPacket->busPacketType == BusPacket::WRITE_P)
-				{
-					bankStates[rank][bank].nextRead = bankStates[rank][bank].nextActivate;
-					bankStates[rank][bank].nextWrite = bankStates[rank][bank].nextActivate;
+					cmdStat.activateCounter++;
+					break;
+				case BusPacket::PRECHARGE:
+					bankStates[rank][bank].currentBankState = BankState::Precharging;
+					bankStates[rank][bank].lastCommand = BusPacket::PRECHARGE;
+					bankStates[rank][bank].stateChangeCountdown = tRP;
+					bankStates[rank][bank].nextActivate = max(currentClockCycle + tRP, bankStates[rank][bank].nextActivate);
 
-					cmdStat.writepCounter++;
-				}
-				else
-				{
-					cmdStat.writeCounter++;
-				}
-				break;
-
-			case BusPacket::ACTIVATE:
-				//add energy to account for total
-				if (DEBUG_POWER)
-				{
-					PRINT(" ++ Adding Activate and Precharge energy to total energy");
-				}
-				actpreEnergy[rank] += ((IDD0 * tRC) - ((IDD3N * tRAS) + (IDD2N * (tRC - tRAS)))) * len;
-
-				bankStates[rank][bank].currentBankState = BankState::RowActive;
-				bankStates[rank][bank].lastCommand = BusPacket::ACTIVATE;
-				bankStates[rank][bank].openRowAddress = poppedBusPacket->row;
-				bankStates[rank][bank].nextActivate = max(currentClockCycle + tRC, bankStates[rank][bank].nextActivate);
-				bankStates[rank][bank].nextPrecharge = max(currentClockCycle + tRAS, bankStates[rank][bank].nextPrecharge);
-
-				//if we are using posted-CAS, the next column access can be sooner than normal operation
-
-				bankStates[rank][bank].nextRead = max(currentClockCycle + (tRCD-AL), bankStates[rank][bank].nextRead);
-				bankStates[rank][bank].nextWrite = max(currentClockCycle + (tRCD-AL), bankStates[rank][bank].nextWrite);
-
-				for (size_t i=0;i<NUM_BANKS;i++)
-				{
-					if (i!=poppedBusPacket->bank)
+					cmdStat.prechangeCounter++;
+					break;
+				case BusPacket::REFRESH:
+					//add energy to account for total
+					if (DEBUG_POWER)
 					{
-						bankStates[rank][i].nextActivate = max(currentClockCycle + tRRD, bankStates[rank][i].nextActivate);
+						PRINT(" ++ Adding Refresh energy to total energy");
 					}
-				}
+					refreshEnergy[rank] += (IDD5 - IDD3N) * tRFC * NUM_DEVICES;
 
-				cmdStat.activateCounter++;
-				break;
+					for (size_t i=0;i<NUM_BANKS;i++)
+					{
+						bankStates[rank][i].nextActivate = currentClockCycle + tRFC;
+						bankStates[rank][i].currentBankState = BankState::Refreshing;
+						bankStates[rank][i].lastCommand = BusPacket::REFRESH;
+						bankStates[rank][i].stateChangeCountdown = tRFC;
+					}
 
-			case BusPacket::PRECHARGE:
-				bankStates[rank][bank].currentBankState = BankState::Precharging;
-				bankStates[rank][bank].lastCommand = BusPacket::PRECHARGE;
-				bankStates[rank][bank].stateChangeCountdown = tRP;
-				bankStates[rank][bank].nextActivate = max(currentClockCycle + tRP, bankStates[rank][bank].nextActivate);
-
-				cmdStat.prechangeCounter++;
-				break;
-
-			case BusPacket::REFRESH:
-				//add energy to account for total
-				if (DEBUG_POWER)
-				{
-					PRINT(" ++ Adding Refresh energy to total energy");
-				}
-				refreshEnergy[rank] += (IDD5 - IDD3N) * tRFC * NUM_DEVICES;
-
-				for (size_t i=0;i<NUM_BANKS;i++)
-				{
-					bankStates[rank][i].nextActivate = currentClockCycle + tRFC;
-					bankStates[rank][i].currentBankState = BankState::Refreshing;
-					bankStates[rank][i].lastCommand = BusPacket::REFRESH;
-					bankStates[rank][i].stateChangeCountdown = tRFC;
-				}
-
-				cmdStat.refreshCounter++;
-				break;
-
-			default:
-				ERROR("== Error - Popped a command we shouldn't have of type : " << poppedBusPacket->busPacketType);
-				exit(0);
+					cmdStat.refreshCounter++;
+					break;
+				default:
+					ERROR("== Error - Popped a command we shouldn't have of type : " << poppedBusPacket->busPacketType);
+					exit(0);
 			}
 
 			//issue on bus and print debug
@@ -613,94 +502,73 @@ namespace DRAMSim
 			//	assuming simple scheduling at the moment
 			//	will eventually add policies here
 			Transaction *transaction = transactionQueue[i];
-
+			//add by libing -20120928
+			/*	Caches *myCaches;
+				myCaches=new Caches(NULL,4);
+				myCaches->access_cache(transaction->address, transaction->transactionType);
+			//add by libing -20120928
+			 */
 			//map address to rank,bank,row,col
 			unsigned newChan, newRank, newBank, newRow, newColumn;
 
 			// pass these in as references so they get set by the addressMapping function
 			parentMemorySystem->addressMapping(transaction->address, newChan, newRank, newBank, newRow, newColumn);
 
-			unsigned cmdNum=2;
-			BusPacket::BusPacketType bpType = transaction->getBusPacketType();
-
-#ifdef DATA_RELIABILITY_ICDP
-			cmdNum=(bpType == BusPacket::WRITE || bpType == BusPacket::WRITE_P)?4:2;
-#endif
 			//if we have room, break up the transaction into the appropriate commands
 			//and add them to the command queue
-			if (commandQueue.hasRoomFor( cmdNum, newRank, newBank))
+			if (commandQueue.hasRoomFor(2, newRank, newBank))
 			{
-				if (DEBUG_ADDR_MAP)
-				{
-					PRINTN("== New Transaction - Mapping Address [0x" << hex << transaction->address << dec << "]");
-					if (transaction->transactionType == Transaction::DATA_READ)
-					{
-						PRINT(" (Read)");
-					}
-					else
-					{
-						PRINT(" (Write)");
-					}
-					PRINT("Channel: " << newChan);
-					PRINT("  Rank : " << newRank);
-					PRINT("  Bank : " << newBank);
-					PRINT("  Row  : " << newRow);
-					PRINT(" Column: " << newColumn);
-				}
+				/*if (DEBUG_ADDR_MAP)
+				  {
+				  PRINTN("== New Transaction - Mapping Address [0x" << hex << transaction->address << dec << "]");
+				  if (transaction->transactionType == Transaction::DATA_READ)
+				  {
+				  PRINT(" (Read)");
+				  }
+				  else
+				  {
+				  PRINT(" (Write)");
+				  }
+				  PRINT("Channel: " << newChan);
+				  PRINT("  Rank : " << newRank);
+				  PRINT("  Bank : " << newBank);
+				  PRINT("  Row  : " << newRow);
+				  PRINT(" Column: " << newColumn);
+
+				  }*///commented by libing 2013-4-22
 
 
 
 				//now that we know there is room in the command queue, we can remove from the transaction queue
 				transactionQueue.erase(transactionQueue.begin()+i);
 
-				//create PRE_READ command when write
-	#ifdef ICDP_PRE_READ
-				if (bpType == BusPacket::WRITE || bpType == BusPacket::WRITE_P)
-				{
-
-					BusPacket *PRE_ACTcommand = new BusPacket(BusPacket::ACTIVATE,
-														  newRank,
-														  newBank,
-														  newRow,
-														  newColumn,
-														  transaction->address,
-														  NULL,
-														  transaction->len);
-					commandQueue.enqueue(PRE_ACTcommand);
-
-					int l = transaction->len;
-					BusPacket *PREcommand = new BusPacket(BusPacket::PRE_READ,
-														  newRank,
-														  newBank,
-														  newRow,
-														  newColumn,
-														  transaction->address,
-														  transaction->data,
-														  (l>8-l)?(8-l):l);
-					commandQueue.enqueue(PREcommand);
-				}
-	#endif
-
 				//create activate command to the row we just translated
 				BusPacket *ACTcommand = new BusPacket(BusPacket::ACTIVATE,
-													  newRank,
-													  newBank,
-													  newRow,
-													  newColumn,
-													  transaction->address,
-													  NULL,
-													  transaction->len);
-				commandQueue.enqueue(ACTcommand);
+						newRank,
+						newBank,
+						newRow,
+						newColumn,
+						transaction->address,
+						transaction->data,
+						transaction->len);
 
 				//create read or write command and enqueue it
+				BusPacket::BusPacketType bpType = transaction->getBusPacketType();
+
+				ACTcommand->nextBusPacketType = bpType;
+
 				BusPacket *command = new BusPacket(bpType,
-												   newRank,
-												   newBank,
-												   newRow,
-												   newColumn,
-												   transaction->address,
-												   transaction->data,
-												   transaction->len);
+						newRank,
+						newBank,
+						newRow,
+						newColumn,
+						transaction->address,
+						transaction->data,
+						transaction->len);
+
+
+
+				commandQueue.enqueue(ACTcommand);
 				commandQueue.enqueue(command);
 
 				// If we have a read, save the transaction so when the data comes back
@@ -797,7 +665,6 @@ namespace DRAMSim
 				{
 					PRINT(" ++ Adding IDD3N to total energy [from rank "<< i <<"]");
 				}
-				//TODO:multi-rank ???
 				backgroundEnergy[i] += IDD3N * NUM_DEVICES;
 			}
 			else
@@ -842,22 +709,31 @@ namespace DRAMSim
 			{
 				if (pendingReadTransactions[i]->address == returnTransaction[0]->address)
 				{
-					/*
-					if(Simulator::clockDomainDRAM->clockcycle - pendingReadTransactions[i]->timeAdded > 2000)
-					{
-						pendingReadTransactions[i]->print();
-						exit(0);
-					}
-					*/
+					//if(currentClockCycle - pendingReadTransactions[i]->timeAdded > 2000)
+					//	{
+					//		pendingReadTransactions[i]->print();
+					//		exit(0);
+					//	}
 
 					unsigned chan,rank,bank,row,col;
 					parentMemorySystem->addressMapping(returnTransaction[0]->address,chan,rank,bank,row,col);
-					insertHistogram((Simulator::clockDomainCPU->clockcycle - pendingReadTransactions[i]->timeAdded),rank,bank);
-
+					insertHistogram(Simulator::clockDomainCPU->clockcycle - pendingReadTransactions[i]->timeAdded,rank,bank);
 					//return latency
+					if(DEBUG_ADDR_MAP)// //added by libing 2013-4-23
+					{
+						if (pendingReadTransactions[i]->transactionType == Transaction::DATA_READ)//
+						{
+							PRINT("Read access Address [0x" << hex << pendingReadTransactions[i]->address << dec << "]");
+						}
+						else
+						{
+							PRINT("Write access Address [0x" << hex << pendingReadTransactions[i]->address << dec << "]");
+						}
+						PRINT("  Bank : " << bank <<"  issue  time: " << pendingReadTransactions[i]->timeAdded << " return time: " << Simulator::clockDomainDRAM->clockcycle); //added by libing 2013-4-23
+					}
 					if (parentMemorySystem->ReadDataDone!=NULL)
 					{
-						(*parentMemorySystem->ReadDataDone)(channelID, pendingReadTransactions[i]->address, Simulator::clockDomainCPU->clockcycle);
+						(*parentMemorySystem->ReadDataDone)(channelID, pendingReadTransactions[i]->address, Simulator::clockDomainDRAM->clockcycle);
 					}
 
 					delete pendingReadTransactions[i];
@@ -886,9 +762,10 @@ namespace DRAMSim
 		//
 		if (DEBUG_TRANS_Q)
 		{
-			PRINT("== Printing transaction queue");
+			//	PRINT("== Printing transaction queue");
 			for (size_t i=0;i<transactionQueue.size();i++)
 			{
+				PRINT("== Printing transaction queue");
 				PRINTN("  " << i << "]");
 				transactionQueue[i]->print();
 			}
@@ -940,14 +817,14 @@ namespace DRAMSim
 			this->printStats();
 
 			/*
-			cmdStat.readCounter=0;
-			cmdStat.readpCounter=0;
-			cmdStat.writeCounter=0;
-			cmdStat.writepCounter=0;
-			cmdStat.activateCounter=0;
-			cmdStat.prechangeCounter=0;
-			cmdStat.readCounter=0;
-			*/
+			   cmdStat.readCounter=0;
+			   cmdStat.readpCounter=0;
+			   cmdStat.writeCounter=0;
+			   cmdStat.writepCounter=0;
+			   cmdStat.activateCounter=0;
+			   cmdStat.prechangeCounter=0;
+			   cmdStat.readCounter=0;
+			 */
 
 			totalTransactions = 0;
 			for (size_t i=0;i<NUM_RANKS;i++)
@@ -958,9 +835,6 @@ namespace DRAMSim
 					totalReadsPerBank[SEQUENTIAL(i,j)] = 0;
 					totalWritesPerBank[SEQUENTIAL(i,j)] = 0;
 					totalEpochLatency[SEQUENTIAL(i,j)] = 0;
-
-					errorStat.errorPerBank[SEQUENTIAL(i,j)] = 0;
-					errorStat.recoveryPerBank[SEQUENTIAL(i,j)] = 0;
 				}
 
 				burstEnergy[i] = 0;
@@ -969,9 +843,6 @@ namespace DRAMSim
 				backgroundEnergy[i] = 0;
 				totalReadsPerRank[i] = 0;
 				totalWritesPerRank[i] = 0;
-
-				errorStat.errorPerBank[i]=0;
-				errorStat.recoveryPerRank[i]=0;
 			}
 		}
 	}
@@ -1036,7 +907,8 @@ namespace DRAMSim
 			cyclesElapsed = currentClockCycle % EPOCH_LENGTH;
 		}
 
-		uint64_t totalBytesTransferred = totalTransactions * TRANS_DATA_BYTES;
+		unsigned bytesPerTransaction = (JEDEC_DATA_BUS_BITS*BL)/8;
+		uint64_t totalBytesTransferred = totalTransactions * bytesPerTransaction;
 		double secondsThisEpoch = (double)cyclesElapsed * tCK * 1E-9;
 
 		// only per rank
@@ -1055,25 +927,22 @@ namespace DRAMSim
 		{
 			for (size_t j=0; j<NUM_BANKS; j++)
 			{
-				bandwidth[SEQUENTIAL(i,j)] = (((double)(totalReadsPerBank[SEQUENTIAL(i,j)]+totalWritesPerBank[SEQUENTIAL(i,j)]) * (double)TRANS_DATA_BYTES)/(1024.0*1024.0*1024.0)) / secondsThisEpoch;
-				averageLatency[SEQUENTIAL(i,j)] = ((float)totalEpochLatency[SEQUENTIAL(i,j)] / (float)(totalReadsPerBank[SEQUENTIAL(i,j)])) * Simulator::clockDomainCPU->time;
+				bandwidth[SEQUENTIAL(i,j)] = (((double)(totalReadsPerBank[SEQUENTIAL(i,j)]+totalWritesPerBank[SEQUENTIAL(i,j)]) * (double)bytesPerTransaction)/(1024.0*1024.0*1024.0)) / secondsThisEpoch;
+				averageLatency[SEQUENTIAL(i,j)] = ((float)totalEpochLatency[SEQUENTIAL(i,j)] / (float)(totalReadsPerBank[SEQUENTIAL(i,j)])) * tCK;
 				totalBandwidth+=bandwidth[SEQUENTIAL(i,j)];
 				totalReadsPerRank[i] += totalReadsPerBank[SEQUENTIAL(i,j)];
 				totalWritesPerRank[i] += totalWritesPerBank[SEQUENTIAL(i,j)];
 
-				errorStat.errorPerRank[i] += errorStat.errorPerBank[SEQUENTIAL(i,j)];
-				errorStat.recoveryPerRank[i] += errorStat.recoveryPerBank[SEQUENTIAL(i,j)];
-
 				grandTotalBankAccesses[SEQUENTIAL(i,j)] += totalReadsPerBank[SEQUENTIAL(i,j)] + totalWritesPerBank[SEQUENTIAL(i,j)];
 			}
 		}
-	#ifdef LOG_OUTPUT
+#ifdef LOG_OUTPUT
 		SimulatorIO::logFile.precision(3);
 		SimulatorIO::logFile.setf(ios::fixed,ios::floatfield);
-	#else
+#else
 		cout.precision(3);
 		cout.setf(ios::fixed,ios::floatfield);
-	#endif
+#endif
 
 		PRINT( " =======================================================" );
 		PRINT( " ============== Printing Statistics [id:"<<channelID<<"]==============" );
@@ -1081,11 +950,12 @@ namespace DRAMSim
 		PRINT( " ("<<totalBytesTransferred <<" bytes) aggregate average bandwidth "<<totalBandwidth<<"GB/s");
 		PRINT("  == Pending Transactions : "<<pendingReadTransactions.size()<<" ("<<currentClockCycle<<")==");
 		/*
-		for(size_t i=0;i<pendingReadTransactions.size();i++)
-		{
-			PRINT("["<< i << "] I've been waiting for "<< currentClockCycle - pendingReadTransactions[i]->timeAdded);
-		}
-		*/
+		   for(size_t i=0;i<pendingReadTransactions.size();i++)
+		   {
+		   PRINT("["<< i << "] I've been waiting for "<< currentClockCycle - pendingReadTransactions[i]->timeAdded);
+		   }
+		 */
+
 
 		// only the first memory channel should print the timestamp
 		if (VIS_FILE_OUTPUT && channelID == 0)
@@ -1096,57 +966,29 @@ namespace DRAMSim
 		double totalAggregateBandwidth = 0.0;
 		for (size_t r=0;r<NUM_RANKS;r++)
 		{
+
 			PRINT( "    -Rank   "<<r<<" : ");
 			PRINTN( "        -Reads  : " << totalReadsPerRank[r]);
-			PRINT( " ("<<totalReadsPerRank[r] * TRANS_DATA_BYTES<<" bytes)");
+			PRINT( " ("<<totalReadsPerRank[r] * bytesPerTransaction<<" bytes)");
 			PRINTN( "        -Writes : " << totalWritesPerRank[r]);
-			PRINT( " ("<<totalWritesPerRank[r] * TRANS_DATA_BYTES<<" bytes)");
-
-			PRINT( "        -Faults   : " << errorStat.errorPerRank[r]);
-			//PRINT( " ("<<totalReadsPerRank[r] * TRANS_DATA_BYTES<<" bytes)");
-			PRINT( "        -Recovery : " << errorStat.recoveryPerRank[r]);
-			//PRINT( " ("<<totalWritesPerRank[r] * TRANS_DATA_BYTES<<" bytes)");
-
-			long double recoveryRate=1;
-			if(errorStat.errorPerRank[r]>0)
-			{
-				recoveryRate=(long double)errorStat.recoveryPerRank[r]/errorStat.errorPerRank[r];
-				PRINT( "        -Recovery Rate : " <<recoveryRate*100<<"%");
-			}
-
+			PRINT( " ("<<totalWritesPerRank[r] * bytesPerTransaction<<" bytes)");
 			for (size_t j=0;j<NUM_BANKS;j++)
 			{
-				PRINTN( "      -Bandwidth / Latency / Fault / Recovery (Bank " <<j<<"): ");
-				PRINTN(bandwidth[SEQUENTIAL(r,j)] << " GB/s\t" <<averageLatency[SEQUENTIAL(r,j)] << " ns\t");
-				if(errorStat.errorPerBank[SEQUENTIAL(r,j)]>0)
-				{
-					PRINTN(errorStat.errorPerBank[SEQUENTIAL(r,j)] << "\t" <<errorStat.recoveryPerBank[SEQUENTIAL(r,j)]<<"\t");
-					PRINT((double)errorStat.recoveryPerBank[SEQUENTIAL(r,j)]/errorStat.errorPerBank[SEQUENTIAL(r,j)]*100<<"%");
-				}
-				else
-				{
-					cout<<endl;
-				}
+				PRINT( "      -Bandwidth / Latency  (Bank " <<j<<"): " <<bandwidth[SEQUENTIAL(r,j)] << " GB/s\t" <<averageLatency[SEQUENTIAL(r,j)] << " ns");
 			}
 
-			double tAveLatency=0;
-			for (size_t j=0; j<NUM_BANKS; j++)
+			double tAveLatency;
+			for (size_t i=0; i<NUM_RANKS; i++)
 			{
-				tAveLatency += averageLatency[SEQUENTIAL(r,j)];
+				for (size_t j=0; j<NUM_BANKS; j++)
+				{
+					tAveLatency += averageLatency[SEQUENTIAL(i,j)];
+				}
 			}
-
 			double totalRW=cmdStat.readCounter+cmdStat.readpCounter+cmdStat.writeCounter+cmdStat.writepCounter;
-			double totalR=cmdStat.readCounter+cmdStat.readpCounter;
-			double tAveReadInterval=cyclesElapsed*tCK/totalR;
-			PRINT("      -Total    Average    Latency  :\t\t\t"<< tAveLatency/NUM_BANKS <<" ns");
+			PRINT("      -Total    Average    Latency  :\t\t\t"<< tAveLatency/(NUM_RANKS*NUM_BANKS) <<" ns");
 			PRINT("      -Workload Character[(clock*tck)/(Read+Write)] = \t"<< (cyclesElapsed*tCK)/totalRW <<" ns");
 
-
-			long double faultInjectionVolum=(long double)60*60*1000/tAveReadInterval*SER_SBU_RATE*TOTAL_STORAGE*8*1000000000;
-			long double unrepairedFaultVolum=faultInjectionVolum-recoveryRate*faultInjectionVolum;
-
-			PRINT("      -Total Fault-Injection   Volum = \t"<<faultInjectionVolum<<" FIT/Mbit");
-			PRINT("      -Total Unrepaired-Faults Volum = \t"<<unrepairedFaultVolum<<" FIT/Mbit");
 
 			// factor of 1000 at the end is to account for the fact that totalEnergy is accumulated in mJ since IDD values are given in mA
 			backgroundPower[r] = ((double)backgroundEnergy[r] / (double)(cyclesElapsed)) * Vdd / 1000.0;
@@ -1231,7 +1073,6 @@ namespace DRAMSim
 			PRINT(" --- DDR DRAM Command Statistics");
 			PRINT("    READ:" << cmdStat.readCounter);
 			PRINT("    READ_P:" << cmdStat.readpCounter);
-			PRINT("    PRE_READ:" << cmdStat.prereadCounter);
 			PRINT("    WRITE:" << cmdStat.writeCounter);
 			PRINT("    WRITE_P:" << cmdStat.writepCounter);
 			PRINT("    ACTIVATE:" << cmdStat.activateCounter);
@@ -1240,9 +1081,9 @@ namespace DRAMSim
 		}
 
 
-	#ifdef LOG_OUTPUT
+#ifdef LOG_OUTPUT
 		SimulatorIO::logFile.flush();
-	#endif
+#endif
 	}
 
 	MemoryController::~MemoryController()
@@ -1266,33 +1107,6 @@ namespace DRAMSim
 		totalEpochLatency[SEQUENTIAL(rank,bank)] += latencyValue;
 		//poor man's way to bin things.
 		latencies[(latencyValue/HISTOGRAM_BIN_SIZE)*HISTOGRAM_BIN_SIZE]++;
-	}
-
-
-	long double MemoryController::PossionCumulativeEXP(int k,long double lambda)
-	{
-	    long double l=exp(-lambda);
-	    long double F = 0;
-
-	    for(int i=1;i<k+1;i++)
-	    {
-	      l=l*(long double)lambda/k;
-	      F+=l*i;
-	    }
-	    return F;
-	}
-
-	long double MemoryController::PossionCumulative(int k,long double lambda)
-	{
-	    long double l=exp(-lambda);
-	    long double F = l;
-
-	    for(int i=1;i<k+1;i++)
-	    {
-	      l=l*(long double)lambda/k;
-	      F+=l;
-	    }
-	    return F;
 	}
 
 } // end of namespace DRAMSim

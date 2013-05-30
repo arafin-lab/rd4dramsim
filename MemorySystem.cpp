@@ -46,7 +46,24 @@ namespace DRAMSim
 	MemorySystem::MemorySystem(): ReadDataDone(NULL),WriteDataDone(NULL)
 	{
 
-		NUM_DEVICES = (BUS_TOTAL_BITS / DEVICE_WIDTH)*NUM_RANKS;
+#ifdef DATA_RELIABILITY_ECC
+		//ECC BUS BITS
+		JEDEC_DATA_BUS_BITS = JEDEC_DATA_BITS / BL;
+		ECC_DATA_BUS_BITS = ECC_DATA_BITS / BL;
+		NUM_DEVICES = ECC_DATA_BUS_BITS/DEVICE_WIDTH;
+#else
+		NUM_DEVICES = JEDEC_DATA_BUS_BITS / DEVICE_WIDTH;
+#endif
+
+#ifdef DATA_STORAGE_SSA
+		TRANS_DATA_BYTES = SUBARRAY_DATA_BYTES * NUM_DEVICES;
+#else
+	#ifdef DATA_RELIABILITY_ECC
+		TRANS_DATA_BYTES = ECC_DATA_BUS_BITS * BL / 8;
+	#else
+		TRANS_DATA_BYTES = JEDEC_DATA_BUS_BITS * BL / 8;
+	#endif
+#endif
 
 		for (size_t iChannel=0; iChannel<NUM_CHANS; iChannel++)
 		{
@@ -62,11 +79,7 @@ namespace DRAMSim
 			}
 
 			PRINTN("MemoryChannel "<<iChannel<<" :");
-			PRINT("CH. " <<iChannel
-				  <<" TOTAL_STORAGE : "<< TOTAL_STORAGE<< "MB | "
-				  << NUM_RANKS <<" Ranks | "
-				  << NUM_DEVICES/NUM_RANKS/NUM_CHANS <<" Devices per rank | "
-				  << DEVICE_WIDTH << " Bits per device");
+			PRINT("CH. " <<iChannel<<" TOTAL_STORAGE : "<< TOTAL_STORAGE << "MB | "<<NUM_RANKS<<" Ranks | "<< NUM_DEVICES <<" Devices per rank");
 		}
 	}
 
@@ -144,7 +157,7 @@ namespace DRAMSim
 	{
 		unsigned iChannel = findChannelNumber(trans->address);
 
-#ifdef MEMORYSYSTEM_BUFFER
+#ifdef MS_BUFFER
 		if (memoryControllers[iChannel]->addTransaction(trans))
 		{
 			return true;
@@ -164,12 +177,12 @@ namespace DRAMSim
 	{
 		unsigned iChannel = findChannelNumber(addr);
 		Transaction::TransactionType type = isWrite ? Transaction::DATA_WRITE : Transaction::DATA_READ;
-		Transaction *trans = new Transaction(type,addr,NULL,TRANS_DATA_BYTES/SUBRANK_DATA_BYTES,Simulator::clockDomainCPU->clockcycle);
+		Transaction *trans = new Transaction(type,addr,NULL,LEN_DEF,Simulator::clockDomainCPU->clockcycle);
 
 		// push_back in memoryController will make a copy of this during
 		// addTransaction so it's kosher for the reference to be local
 
-#ifdef MEMORYSYSTEM_BUFFER
+#ifdef MS_BUFFER
 		if (memoryControllers[iChannel]->addTransaction(trans))
 		{
 			return true;
@@ -221,16 +234,16 @@ namespace DRAMSim
 		unsigned	  rowBitWidth = dramsim_log2(NUM_ROWS);
 		unsigned	  colBitWidth = dramsim_log2(NUM_COLS);
 		// this forces the alignment to the width of a single burst (64 bits = 8 bytes = 3 address bits for DDR parts)
-		unsigned	byteOffsetWidth = dramsim_log2(TRANS_DATA_BYTES/BL);
-		// Since we're assuming that a request is for BL*BUS_WIDTH(=TRANS_DATA_BYTES/BL), the bottom bits
+		unsigned	byteOffsetWidth = dramsim_log2((JEDEC_DATA_BUS_BITS/8));
+		// Since we're assuming that a request is for BL*BUS_WIDTH, the bottom bits
 		// of this address *should* be all zeros if it's not, issue a warning
 
 		if ((physicalAddress & transactionMask) != 0)
 		{
-			PRINTN("WARNING: address 0x"<<std::hex<<physicalAddress<<std::dec<<" is not aligned to the request size of "<<TRANS_DATA_BYTES<<" bytes.");
+			DEBUG("WARNING: address 0x"<<std::hex<<physicalAddress<<std::dec<<" is not aligned to the request size of "<<TRANS_DATA_BYTES);
 		}
 
-		// each burst will contain BUS_DATA_BITS/8 bytes of data, so the bottom bits (3 bits for a single channel DDR system) are
+		// each burst will contain JEDEC_DATA_BUS_BITS/8 bytes of data, so the bottom bits (3 bits for a single channel DDR system) are
 		// 	thrown away before mapping the other bits
 		physicalAddress >>= byteOffsetWidth;
 

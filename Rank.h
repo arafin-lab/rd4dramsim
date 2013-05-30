@@ -31,6 +31,10 @@
 #ifndef RANK_H
 #define RANK_H
 
+#ifdef DATA_STORAGE_SSA
+	#include "Subarray.h"
+#endif
+
 #include "BusPacket.h"
 #include "SystemConfiguration.h"
 #include "Bank.h"
@@ -41,6 +45,8 @@ namespace DRAMSim
 	using namespace std;
 
 	class MemoryController;  //forward declaration
+
+#ifndef DATA_STORAGE_SSA
 
 	class Rank
 	{
@@ -74,7 +80,40 @@ namespace DRAMSim
 		vector<Bank> banks;
 	};
 
+#else
+	class Rank
+	{
+	private:
+		bool isPowerDown;
+		int id;
+		unsigned incomingWriteBank;
+		unsigned incomingWriteRow;
+		unsigned incomingWriteColumn;
 
+	public:
+		//functions
+		Rank(int id, MemoryController *mc);
+		virtual ~Rank();
+		void receiveFromBus(BusPacket *packet);
+		int getId() const;
+		void update();
+		void powerUp();
+		void powerDown();
+
+		//fields
+		bool refreshWaiting;
+		unsigned dataCyclesLeft;
+		MemoryController *memoryController;
+		BusPacket *outgoingDataPacket;
+
+		//these are vectors so that each element is per-bank
+		vector<BusPacket *> readReturnPacket;
+		vector<unsigned> readReturnCountdown;
+		vector<BankState> bankStates;
+		vector< vector<Subarray> > subarrays;
+	};
+
+#endif
 } // end of namespace DRAMSim
 #endif
 

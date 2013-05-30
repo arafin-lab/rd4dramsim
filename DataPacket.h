@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <cstdlib> //free
 #include <iostream>
+//#include <bitset>
 #include "SystemConfiguration.h"
 
 namespace DRAMSim
@@ -16,8 +17,9 @@ namespace DRAMSim
 	{
 	public:
 		DataPacket();
-		~DataPacket();
 		DataPacket(byte *data, size_t numBytes, uint64_t unalignedAddr);
+		~DataPacket();
+
 		uint64_t getAddr() const;
 		size_t getNumBytes() const;
 		size_t getNumSubarray() const;

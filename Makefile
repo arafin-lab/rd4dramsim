@@ -1,8 +1,9 @@
+CXXFLAGS=-Wall -Wno-reorder -DDEBUG_BUILD 
 OPTFLAGS=-O3 
+
 
 ifdef DEBUG
 ifeq ($(DEBUG), 1)
-CXXFLAGS=-Wall -Wno-reorder -DDEBUG_BUILD
 OPTFLAGS= -O0 -g
 endif
 endif

@@ -39,9 +39,8 @@ namespace DRAMSim
 {
 	class BusPacket
 	{
+		BusPacket();
 	public:
-		~BusPacket();
-
 		typedef enum
 		{
 			READ,
@@ -52,21 +51,13 @@ namespace DRAMSim
 			PRECHARGE,
 			REFRESH,
 			DATA
-#ifdef DATA_RELIABILITY_ICDP
-	#ifdef ICDP_PRE_READ
-			,PRE_READ
-			,REG_DATA
-	#endif
-	#ifdef ICDP_LONG_WRITE
-			,ICDP_WRITE
-			,ICDP_WRITE_P
-	#endif
-#endif
 		} BusPacketType;
 
 		//Fields
 		BusPacketType busPacketType;
 		uint64_t physicalAddress;
+
+		BusPacketType nextBusPacketType;
 
 		unsigned rank;
 		unsigned bank;
@@ -78,58 +69,54 @@ namespace DRAMSim
 		//void *data;
 		DataPacket *data;
 
-		BusPacket *ssrData;
-
 		//Functions
-		BusPacket(BusPacketType packtype, unsigned rk, unsigned bk=0, unsigned rw=0, unsigned col=0, uint64_t physicalAddr=0, DataPacket *dat=NULL, size_t len=TRANS_TOTAL_BYTES/SUBRANK_DATA_BYTES);
+		BusPacket(BusPacketType packtype, unsigned rk, unsigned bk=0, unsigned rw=0, unsigned col=0, uint64_t physicalAddr=0, DataPacket *dat=NULL, size_t len=LEN_DEF);
 
 		void print();
 		void print(uint64_t currentClockCycle, bool dataStart);
 		void printData() const;
 
 
-#ifdef DATA_RELIABILITY
+#ifdef DATA_RELIABILITY_ECC
 
-		typedef enum
-		{
-			ENCODE,
-			DECODE,
-			CHECK,
-			CORRECTION
-		} RELIABLE_OP;
-
-		void DATA_ENCODE();
-		void DATA_DECODE();
-
-		int DATA_CHECK(int error);
-		int DATA_CORRECTION(int error);
+	typedef enum
+	{
+		ENCODE,
+		DECODE,
+		CHECK,
+		CORRECTION
+	} RELIABLE_OP;
 
 
-	#ifdef DATA_RELIABILITY_ICDP
+#ifdef DATA_RELIABILITY_CHIPKILL
+	void CHIPKILL(RELIABLE_OP op);
 
-		int ICDP(RELIABLE_OP op);
-
-	#endif
-
-
-
-	#ifdef DATA_RELIABILITY_CHIPKILL
-		void CHIPKILL(RELIABLE_OP op);
-	#endif
-
-
-	#ifdef DATA_RELIABILITY_ECC
-		int ECC_HAMMING_SECDED(RELIABLE_OP eccop, int n = 72, int m = 64);
-	#endif
+	#define ECC_WORD_BITS 72
+	#define ECC_CHECK_BITS 8
+	#define ECC_DATA_BITS 2304			//(ECC_DATA_BUS_BITS * BL)
+	#define JEDEC_DATA_BITS 2048		//(JEDEC_DATA_BUS_BITS * BL)
+#else
+	#define ECC_CHECK_BITS 8
+	#define ECC_DATA_BITS 576		//(ECC_DATA_BUS_BITS * BL)
+	#define JEDEC_DATA_BITS 512			//(JEDEC_DATA_BUS_BITS * BL)
+#endif
 
 
-		#define POSITION_REVISE(i) ((int)pow(2.0, i) - i - 2)
-		#define CHECKBIT_POSITION(i) ((int)pow(2.0, i) - 1)
+	#define POSITION_REVISE(i) ((int)pow(2.0, i) - i - 2)
+	#define CHECKBIT_POSITION(i) ((int)pow(2.0, i) - 1)
+
+	void DATA_ENCODE();
+	void DATA_DECODE();
+
+	bool DATA_CHECK();
+	bool DATA_CORRECTION();
+
+	bool ECC_HAMMING_SECDED(RELIABLE_OP eccop, int n = 72, int m = 64);
 
 
 
-		byte *BitstoByteArray(bitset<TRANS_DATA_BYTES*8> &bits);
-		byte *BitstoByteArray(bitset<TRANS_TOTAL_BYTES*8> &bits);
+	byte *BitstoByteArray(bitset<JEDEC_DATA_BITS> &bits);
+	byte *BitstoByteArray(bitset<ECC_DATA_BITS> &bits);
 
 
 #define BitsfromByteArray(BITS,LEN)		 		\
@@ -142,8 +129,7 @@ namespace DRAMSim
 			}									\
 		}
 
-
-#endif //DATA_RELIABILITY
+#endif
 
 	};
 }

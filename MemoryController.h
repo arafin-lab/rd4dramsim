@@ -65,9 +65,6 @@ namespace DRAMSim
 		void update();
 		void printStats(bool finalStats = false);
 
-		long double PossionCumulativeEXP(int k,long double lambda);
-		long double PossionCumulative(int k,long double lambda);
-
 
 		//fields
 		vector<Transaction *> transactionQueue;
@@ -77,26 +74,6 @@ namespace DRAMSim
 		vector< uint64_t > burstEnergy;
 		vector< uint64_t > actpreEnergy;
 		vector< uint64_t > refreshEnergy;
-
-		struct ErrorStat
-		{
-			ErrorStat ()
-			{
-				totalError=0;
-				errorPerBank = vector<uint64_t>(NUM_RANKS*NUM_BANKS,0);
-				recoveryPerBank = vector<uint64_t>(NUM_RANKS*NUM_BANKS,0);
-				errorPerRank = vector<uint64_t>(NUM_RANKS,0);
-				recoveryPerRank = vector<uint64_t>(NUM_RANKS,0);
-			}
-
-			uint64_t totalError;
-			vector<uint64_t> grandTotalError;
-			vector<uint64_t> errorPerBank;
-			vector<uint64_t> recoveryPerBank;
-			vector<uint64_t> errorPerRank;
-			vector<uint64_t> recoveryPerRank;
-		} errorStat;
-
 	private:
 		MemorySystem *parentMemorySystem;
 		vector<Rank *> *ranks;
@@ -148,7 +125,6 @@ namespace DRAMSim
 			{
 				readCounter=0;
 				readpCounter=0;
-				prereadCounter=0;
 				writeCounter=0;
 				writepCounter=0;
 				activateCounter=0;
@@ -157,7 +133,6 @@ namespace DRAMSim
 
 				readSum=0;
 				readpSum=0;
-				prereadSum=0;
 				writeSum=0;
 				writepSum=0;
 				activateSum=0;
@@ -167,7 +142,6 @@ namespace DRAMSim
 
 			unsigned readCounter;
 			unsigned readpCounter;
-			unsigned prereadCounter;
 			unsigned writeCounter;
 			unsigned writepCounter;
 			unsigned activateCounter;
@@ -176,7 +150,6 @@ namespace DRAMSim
 
 			unsigned readSum;
 			unsigned readpSum;
-			unsigned prereadSum;
 			unsigned writeSum;
 			unsigned writepSum;
 			unsigned activateSum;

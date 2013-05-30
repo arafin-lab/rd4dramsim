@@ -69,9 +69,10 @@ namespace DRAMSim
 		uint64_t timeAdded;
 		uint64_t timeReturned;
 		uint64_t timeTraced;
-
+		//add on 20121030 by libing to record cache access time 
+		uint64_t timeIssued ;
 		//functions
-		Transaction(TransactionType transType, uint64_t addr, DataPacket *data, size_t len=TRANS_DATA_BYTES/SUBRANK_DATA_BYTES, uint64_t time = 0);
+		Transaction(TransactionType transType, uint64_t addr, DataPacket *data, size_t len=LEN_DEF, uint64_t time = 0);
 		Transaction(const Transaction &t);
 
 		void alignAddress();
@@ -129,14 +130,12 @@ namespace DRAMSim
 						exit(-1);
 					}
 				}
-				if (DEBUG_TRANS_LATENCY == true)
-				{
-					uint64_t added_cycle = pendingReadRequests[address].front();
-					uint64_t latency = (done_cycle - added_cycle);
 
-					pendingReadRequests[address].pop_front();
-					cout << "Read Callback:  0x"<< std::hex << address << std::dec << " latency="<<latency<<"cycles ("<< done_cycle<< "->"<<added_cycle<<")"<<endl;
-				}
+				uint64_t added_cycle = pendingReadRequests[address].front();
+				uint64_t latency = done_cycle - added_cycle;
+
+				pendingReadRequests[address].pop_front();
+				cout << "Read Callback:  0x"<< std::hex << address << std::dec << " latency="<<latency<<"cycles ("<< done_cycle<< "->"<<added_cycle<<")"<<endl;
 				counter--;
 			}
 
@@ -157,14 +156,12 @@ namespace DRAMSim
 						exit(-1);
 					}
 				}
-				if (DEBUG_TRANS_LATENCY == true)
-				{
-					uint64_t added_cycle = pendingWriteRequests[address].front();
-					uint64_t latency = done_cycle - added_cycle;
 
-					pendingWriteRequests[address].pop_front();
-					cout << "Write Callback: 0x"<< std::hex << address << std::dec << " latency="<<latency<<"cycles ("<< done_cycle<< "->"<<added_cycle<<")"<<endl;
-				}
+				uint64_t added_cycle = pendingWriteRequests[address].front();
+				uint64_t latency = done_cycle - added_cycle;
+
+				pendingWriteRequests[address].pop_front();
+				cout << "Write Callback: 0x"<< std::hex << address << std::dec << " latency="<<latency<<"cycles ("<< done_cycle<< "->"<<added_cycle<<")"<<endl;
 				counter--;
 			}
 

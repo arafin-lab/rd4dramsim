@@ -55,7 +55,9 @@ namespace DRAMSim
 			nextRankPRE(0),
 			refreshRank(0),
 			refreshWaiting(false),
-			sendAct(true)
+			sendAct(true),
+			CQmode(0),
+			WRcounter(0)
 	{
 
 		//use numBankQueus below to create queue structure
@@ -141,6 +143,15 @@ namespace DRAMSim
 				ERROR("						Need to call .hasRoomFor(int numberToEnqueue, unsigned rank, unsigned bank) first");
 				exit(0);
 			}
+
+			if (newBusPacket->busPacketType == BusPacket::WRITE || newBusPacket->busPacketType == BusPacket::WRITE_P)
+			{
+				WRcounter++;
+				if (WRcounter >= CQ_TH_UP)
+				{
+					CQmode = 1;
+				}
+			}
 		}
 		else if (queuingStructure==PerRankPerBank)
 		{
@@ -151,6 +162,16 @@ namespace DRAMSim
 				ERROR("						Need to call .hasRoomFor(int numberToEnqueue, unsigned rank, unsigned bank) first");
 				exit(0);
 			}
+
+			if (newBusPacket->busPacketType == BusPacket::WRITE || newBusPacket->busPacketType == BusPacket::WRITE_P)
+			{
+				WRcounter++;
+				if (WRcounter >= CQ_TH_UP)
+				{
+					CQmode = 1;
+				}
+			}
+
 		}
 		else
 		{
@@ -274,13 +295,8 @@ namespace DRAMSim
 								{
 									//check to make sure we aren't removing a read/write that is paired with an activate
 									if (i>0 && queue[i-1]->busPacketType==BusPacket::ACTIVATE &&
-											   queue[i-1]->physicalAddress == queue[i]->physicalAddress)
+											queue[i-1]->physicalAddress == queue[i]->physicalAddress)
 										continue;
-								#ifdef ICDP_PRE_READ
-									if (i>2 && queue[i]->busPacketType==BusPacket::WRITE &&
-											   queue[i-2]->busPacketType==BusPacket::PRE_READ)
-										continue;
-								#endif
 
 									*busPacket = queue[i];
 									queue.erase(queue.begin()+i);
@@ -305,7 +321,15 @@ namespace DRAMSim
 					}
 
 					//if we found something, break out of do-while
-					if (foundIssuable) break;
+					if (foundIssuable)
+					{
+						if ((*busPacket)->busPacketType == BusPacket::WRITE || (*busPacket)->busPacketType == BusPacket::WRITE_P)
+						{
+							WRcounter--;
+							if (WRcounter <= CQ_TH_DN) CQmode=0;
+						}
+						break;
+					}
 
 					//rank round robin
 					if (queuingStructure == PerRank)
@@ -430,8 +454,8 @@ namespace DRAMSim
 								{
 									BusPacket *prevPacket = queue[j];
 									if (prevPacket->busPacketType != BusPacket::ACTIVATE &&
-										prevPacket->bank == packet->bank &&
-										prevPacket->row == packet->row)
+											prevPacket->bank == packet->bank &&
+											prevPacket->row == packet->row)
 									{
 										dependencyFound = true;
 										break;
@@ -466,7 +490,15 @@ namespace DRAMSim
 					}
 
 					//if we found something, break out of do-while
-					if (foundIssuable) break;
+					if (foundIssuable)
+					{
+						if ((*busPacket)->busPacketType == BusPacket::WRITE || (*busPacket)->busPacketType == BusPacket::WRITE_P)
+						{
+							WRcounter--;
+							if (WRcounter <= CQ_TH_DN) CQmode=0;
+						}
+						break;
+					}
 
 					//rank round robin
 					if (queuingStructure == PerRank)
@@ -575,7 +607,7 @@ namespace DRAMSim
 			PRINT(endl << "== Printing Per Rank Queue" );
 			for (size_t i=0;i<NUM_RANKS;i++)
 			{
-				PRINT(" = Rank " << i << "  size : " << queues[i][0].size() <<"  Clock :" << Simulator::clockDomainDRAM->clockcycle);
+				PRINT(" = Rank " << i << "  size : " << queues[i][0].size() );
 				for (size_t j=0;j<queues[i][0].size();j++)
 				{
 					PRINTN("    "<< j << "]");
@@ -638,14 +670,16 @@ namespace DRAMSim
 
 			break;
 		case BusPacket::ACTIVATE:
-			if ((bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::Idle ||
-					bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::Refreshing) &&
-					currentClockCycle >= bankStates[busPacket->rank][busPacket->bank].nextActivate &&
-					tFAWCountdown[busPacket->rank].size() < 4
-	#ifdef ICDP_PRE_READ
-				&& bankStates[busPacket->rank][busPacket->bank].preReadState == false
-	#endif
-				)
+			if ((
+				(busPacket->nextBusPacketType == BusPacket::WRITE && CQmode == 1) ||
+				(busPacket->nextBusPacketType == BusPacket::WRITE_P && CQmode == 1) ||
+				(busPacket->nextBusPacketType == BusPacket::READ && CQmode == 0) ||
+				(busPacket->nextBusPacketType == BusPacket::READ_P && CQmode == 0)
+				) &&
+				(bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::Idle ||
+				bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::Refreshing) &&
+				currentClockCycle >= bankStates[busPacket->rank][busPacket->bank].nextActivate &&
+				tFAWCountdown[busPacket->rank].size() < 4)
 			{
 				return true;
 			}
@@ -656,14 +690,11 @@ namespace DRAMSim
 			break;
 		case BusPacket::WRITE:
 		case BusPacket::WRITE_P:
-			if (bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::RowActive &&
+			if (CQmode==1 &&
+				bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::RowActive &&
 				currentClockCycle >= bankStates[busPacket->rank][busPacket->bank].nextWrite &&
 				busPacket->row == bankStates[busPacket->rank][busPacket->bank].openRowAddress &&
-				rowAccessCounters[busPacket->rank][busPacket->bank] < TOTAL_ROW_ACCESSES
-	#ifdef ICDP_PRE_READ
-				&& bankStates[busPacket->rank][busPacket->bank].preReadState == true
-	#endif
-				)
+				rowAccessCounters[busPacket->rank][busPacket->bank] < TOTAL_ROW_ACCESSES)
 			{
 				return true;
 			}
@@ -672,11 +703,10 @@ namespace DRAMSim
 				return false;
 			}
 			break;
-#ifdef DATA_RELIABILITY_ICDP
-	#ifdef ICDP_LONG_WRITE
-		case BusPacket::ICDP_WRITE:
-		case BusPacket::ICDP_WRITE_P:
-			if (bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::RowActive &&
+		case BusPacket::READ_P:
+		case BusPacket::READ:
+			if (CQmode == 0 &&
+				bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::RowActive &&
 				currentClockCycle >= bankStates[busPacket->rank][busPacket->bank].nextRead &&
 				busPacket->row == bankStates[busPacket->rank][busPacket->bank].openRowAddress &&
 				rowAccessCounters[busPacket->rank][busPacket->bank] < TOTAL_ROW_ACCESSES)
@@ -688,36 +718,9 @@ namespace DRAMSim
 				return false;
 			}
 			break;
-	#endif
-	#ifdef ICDP_PRE_READ
-		case BusPacket::PRE_READ:
-	#endif
-#endif
-		case BusPacket::READ_P:
-		case BusPacket::READ:
-			if (bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::RowActive &&
-					currentClockCycle >= bankStates[busPacket->rank][busPacket->bank].nextRead &&
-					busPacket->row == bankStates[busPacket->rank][busPacket->bank].openRowAddress &&
-					rowAccessCounters[busPacket->rank][busPacket->bank] < TOTAL_ROW_ACCESSES
-	#ifdef ICDP_PRE_READ
-					&& bankStates[busPacket->rank][busPacket->bank].preReadState == false
-	#endif
-				)
-			{
-				return true;
-			}
-			else
-			{
-				return false;
-			}
-			break;
 		case BusPacket::PRECHARGE:
 			if (bankStates[busPacket->rank][busPacket->bank].currentBankState == BankState::RowActive &&
-					currentClockCycle >= bankStates[busPacket->rank][busPacket->bank].nextPrecharge
-	#ifdef ICDP_PRE_READ
-				&& bankStates[busPacket->rank][busPacket->bank].preReadState == false
-	#endif
-				)
+					currentClockCycle >= bankStates[busPacket->rank][busPacket->bank].nextPrecharge)
 			{
 				return true;
 			}

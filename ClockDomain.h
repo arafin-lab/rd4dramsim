@@ -9,24 +9,18 @@
 
 namespace DRAMSim
 {
+
 	class ClockDomain
 	{
 	public:
+		uint64_t clockcycle;
 		ClockUpdateCB *callback;
+		uint64_t clock;
+		uint64_t counter;
 		ClockDomain *previousDomain;
 		ClockDomain *nextDomain;
-		unsigned numerator;
-		unsigned denominator;
-		unsigned upCounter;
-		unsigned downCounter;
-		uint64_t clockcycle;
-		uint64_t clock;
-		double time;
-
 
 		ClockDomain(ClockUpdateCB *callback, uint64_t clock = 0);
-
-		void setClockRatio(double ratio);
 
 		void tick();
 	};

@@ -24,8 +24,8 @@ namespace DRAMSim
 		static ClockDomain* clockDomainTREE;
 
 	private:
-		void initClockDomain(double clockRatio);
-
+		void setCPUClock(uint64_t cpuClkFreqHz);
+		void setClockRatio(double ratio);
 
 		SimulatorIO *simIO;
 		MemorySystem *memorySystem;

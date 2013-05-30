@@ -111,19 +111,11 @@ namespace DRAMSim
 		case DATA_WRITE:
 			if (rowBufferPolicy == ClosePage)
 			{
-	#ifdef ICDP_LONG_WRITE
-				return BusPacket::ICDP_WRITE_P;
-	#else
 				return BusPacket::WRITE_P;
-	#endif
 			}
 			else if (rowBufferPolicy == OpenPage)
 			{
-	#ifdef ICDP_LONG_WRITE
-			return BusPacket::ICDP_WRITE;
-	#else
-			return BusPacket::WRITE;
-	#endif
+				return BusPacket::WRITE;
 			}
 			else
 			{

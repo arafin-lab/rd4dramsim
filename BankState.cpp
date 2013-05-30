@@ -48,11 +48,7 @@ namespace DRAMSim
 			nextPrecharge(0),
 			nextPowerUp(0),
 			lastCommand(BusPacket::READ),
-			stateChangeCountdown(0)
-	#ifdef ICDP_PRE_READ
-			,preReadState(false)
-	#endif
-	{}
+			stateChangeCountdown(0)	{}
 
 	void BankState::print()
 	{

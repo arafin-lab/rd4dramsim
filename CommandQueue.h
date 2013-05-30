@@ -74,6 +74,10 @@ namespace DRAMSim
 
 		BusPacket3D queues; // 3D array of BusPacket pointers
 		vector< vector<BankState> > &bankStates;
+
+		unsigned CQmode;
+		//unsigned RDcounter;
+		unsigned WRcounter;
 	private:
 		void nextRankAndBank(unsigned &rank, unsigned &bank);
 		//fields

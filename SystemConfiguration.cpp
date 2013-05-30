@@ -17,10 +17,10 @@ namespace DRAMSim
 	unsigned NUM_DEVICES;
 	unsigned DEVICE_WIDTH;
 
-	unsigned CLOCK_RATIO;
-	float SER_SBU_RATE;
-	// device timing
+	unsigned TRANS_DATA_BYTES;
+	unsigned SUBARRAY_DATA_BYTES;
 
+	// device timing
 	unsigned REFRESH_PERIOD;
 	float tCK;
 	float Vdd;
@@ -58,6 +58,9 @@ namespace DRAMSim
 	unsigned IDD6L;
 	unsigned IDD7;
 
+	// memory system
+	unsigned ECC_DATA_BUS_BITS;
+	unsigned JEDEC_DATA_BUS_BITS;
 
 	//Memory Controller parameters
 	unsigned TRANS_QUEUE_DEPTH;
@@ -82,8 +85,6 @@ namespace DRAMSim
 	QueuingStructure queuingStructure;
 
 
-	bool DEBUG_FAULT_INJECTION;
-	bool DEBUG_TRANS_LATENCY;
 	bool DEBUG_TRANS_Q;
 	bool DEBUG_CMD_Q;
 	bool DEBUG_ADDR_MAP;

@@ -66,10 +66,6 @@ namespace DRAMSim
 		BusPacket::BusPacketType lastCommand;
 		unsigned stateChangeCountdown;
 
-	#ifdef ICDP_PRE_READ
-		bool preReadState;
-	#endif
-
 		//Functions
 		BankState();
 		void print();

@@ -48,106 +48,30 @@
 //SystemConfiguration.h
 //
 
-//#define MEMORYSYSTEM_BUFFER
+
+#define LEN_DEF 8
+#define MS_BUFFER
 
 #define RETURN_TRANSACTIONS
 //#define DATA_STORAGE
-//#define DATA_STORAGE_SSR
-//#define DATA_RELIABILITY
-
+//#define DATA_STORAGE_SSA
 //#define DATA_RELIABILITY_ECC
-#define DATA_RELIABILITY_CHIPKILL
-//#define DATA_RELIABILITY_ICDP
+//#define DATA_RELIABILITY_CHIPKILL
+
+#ifdef DATA_STORAGE_SSA
+	#define DATA_STORAGE
+#endif
+
+#ifdef DATA_RELIABILITY_CHIPKILL
+	#define DATA_RELIABILITY_ECC
+#endif
 
 #ifdef DATA_RELIABILITY_ECC
 	#define DATA_STORAGE
-	#define DATA_RELIABILITY
-
-	#define DATA_WORD_BITS 64
-	#define ECC_WORD_BITS 8
-	#define TOTAL_WORD_BITS 72
-
-	#define FT_BITS 1
-	#define LEN_DEF 8
-
-	#define BUS_DATA_BITS 64
-	#define BUS_ECC_BITS 8
-	#define BUS_TOTAL_BITS 72
-
-	#define TRANS_DATA_BYTES 64
-	#define TRANS_ECC_BYTES 8
-	#define TRANS_TOTAL_BYTES 72
 #endif
 
-
-#ifdef DATA_RELIABILITY_CHIPKILL
-	#define DATA_STORAGE
-	#define DATA_RELIABILITY
-	#define DATA_RELIABILITY_ECC
-
-	#define FT_BITS 32
-	#define LEN_DEF 36
-
-	#define DATA_WORD_BITS 64
-	#define ECC_WORD_BITS 8
-	#define TOTAL_WORD_BITS 72
-
-	#define BUS_DATA_BITS 256
-	#define BUS_ECC_BITS 32
-	#define BUS_TOTAL_BITS 288
-
-	#define TRANS_DATA_BYTES 256
-	#define TRANS_ECC_BYTES 32
-	#define TRANS_TOTAL_BYTES 288
-#endif
-
-
-#ifdef DATA_RELIABILITY_ICDP
-	#define ICDP_LONG_WRITE
-	//#define ICDP_PRE_READ
-	#define DATA_STORAGE_SSR
-	#define DATA_STORAGE
-	#define DATA_RELIABILITY
-
-	#define FT_BITS 64
-	#define LEN_DEF 10
-
-	#define DATA_WORD_BITS 64
-	#define ECC_WORD_BITS 8
-	#define CHECKSUM_BITS 8
-	#define TOTAL_WORD_BITS 80
-
-	#define BUS_DATA_BITS 64
-	#define BUS_ECC_BITS 8
-	#define BUS_CHECKSUM_BITS 8
-	#define BUS_TOTAL_BITS 80
-
-	#define TRANS_DATA_BYTES 64
-	#define TRANS_ECC_BYTES 8
-	#define TRANS_CHECKSUM_BYTES 8
-	#define TRANS_TOTAL_BYTES 80
-#endif
-
-
-#ifdef DATA_STORAGE_SSR
-	#define DATA_STORAGE
-
-	#define SUBRANK_DATA_BYTES 8
-#endif
-
-//default value without reliability design
-#ifndef DATA_RELIABILITY
-	#define FT_BITS 0
-	#define BUS_DATA_BITS 64
-	#define BUS_TOTAL_BITS 64
-	#define TRANS_DATA_BYTES 64
-	#define TRANS_TOTAL_BYTES 64
-#endif
-
-#ifndef DATA_STORAGE_SSR
-	#define SUBRANK_DATA_BYTES 8
-#endif
-
+#define CQ_TH_UP 32
+#define CQ_TH_DN 0
 
 
 namespace DRAMSim
@@ -161,8 +85,6 @@ namespace DRAMSim
 
 	extern bool DEBUG_INI_READER;
 
-	extern bool DEBUG_FAULT_INJECTION;
-	extern bool DEBUG_TRANS_LATENCY;
 	extern bool DEBUG_TRANS_Q;
 	extern bool DEBUG_CMD_Q;
 	extern bool DEBUG_ADDR_MAP;
@@ -181,8 +103,8 @@ namespace DRAMSim
 	extern unsigned NUM_COLS;
 	extern unsigned DEVICE_WIDTH;
 
-	extern unsigned CLOCK_RATIO;
-	extern float SER_SBU_RATE;
+	extern unsigned SUBARRAY_DATA_BYTES;
+	extern unsigned TRANS_DATA_BYTES;
 
 	//in nanoseconds
 	extern unsigned REFRESH_PERIOD;
@@ -236,6 +158,9 @@ namespace DRAMSim
 	#define WRITE_AUTOPRE_DELAY (WL+BL/2+tWR+tRP)
 	#define WRITE_TO_READ_DELAY_B (WL+BL/2+tWTR) //interbank
 	#define WRITE_TO_READ_DELAY_R (WL+BL/2+tRTRS-RL) //interrank
+
+	extern unsigned ECC_DATA_BUS_BITS;
+	extern unsigned JEDEC_DATA_BUS_BITS;
 
 	//Memory Controller related parameters
 	extern unsigned TRANS_QUEUE_DEPTH;

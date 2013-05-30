@@ -9,8 +9,6 @@
 #include "PrintMacros.h"
 #include "Callback.h"
 #include "ClockDomain.h"
-#include "Transaction.h"
-#include <ctime>
 
 
 namespace DRAMSim
@@ -42,6 +40,12 @@ namespace DRAMSim
 		simIO->loadInputParams();
 		simIO->initOutputFiles();
 
+#ifdef DATA_RELIABILITY_ECC
+		//ECC BUS BITS
+		JEDEC_DATA_BUS_BITS = JEDEC_DATA_BITS / BL;
+		ECC_DATA_BUS_BITS = ECC_DATA_BITS / BL;
+#endif
+
 		memorySystem= new MemorySystem();
 
 #ifdef RETURN_TRANSACTIONS
@@ -66,10 +70,8 @@ namespace DRAMSim
 		// Initialize the ClockDomainCrosser to use the CPU speed
 		// If cpuClkFreqHz == 0, then assume a 1:1 ratio (like for TraceBasedSim)
 		// set the frequency ratio to 1:1
-		initClockDomain(CLOCK_RATIO);
+		setCPUClock(0);
 		PRINT("DRAMSim2 Clock Frequency ="<<clockDomainDRAM->clock<<"Hz, CPU Clock Frequency="<<clockDomainCPU->clock<<"Hz");
-
-		srand((unsigned)time(NULL));
 
 	}
 
@@ -86,17 +88,11 @@ namespace DRAMSim
 		}
 		else
 #endif
-		if (simIO->cycleNum != 0)
 		{
 			while (clockDomainTREE->clockcycle < simIO->cycleNum)
 			{
 				clockDomainTREE->tick();
 			}
-		}
-		else
-		{
-			ERROR("Please specify exact cycle numbers(!=0) to run!");
-			exit(0);
 		}
 	}
 
@@ -134,16 +130,49 @@ namespace DRAMSim
 	}
 
 
-	void Simulator::initClockDomain(double clockRatio)
+	void Simulator::setCPUClock(uint64_t cpuClkFreqHz)
 	{
-		clockDomainDRAM->time = tCK;
-		clockDomainCPU->time = tCK/clockRatio;
+		uint64_t dramsimClkFreqHz = (uint64_t)(1.0/(tCK*1e-9));
+		clockDomainDRAM->clock = dramsimClkFreqHz;
+		clockDomainCPU->clock = (cpuClkFreqHz == 0) ? dramsimClkFreqHz : cpuClkFreqHz;
+	}
 
-		clockDomainDRAM->clock = (uint64_t)(1.0/(clockDomainDRAM->time*1e-9));
-		clockDomainCPU->clock = (uint64_t)(1.0/(clockDomainCPU->time*1e-9));
+	void Simulator::setClockRatio(double ratio)
+	{
+		// Compute numerator and denominator for ratio, then pass that to other constructor.
+		double x = ratio;
 
-		clockDomainTREE->setClockRatio(clockRatio);
+		const int MAX_ITER = 15;
+		size_t i;
+		unsigned ns[MAX_ITER], ds[MAX_ITER];
+		double zs[MAX_ITER];
+		ds[0] = 0;
+		ds[1] = 1;
+		zs[1] = x;
+		ns[1] = (int)x;
 
+		for (i = 1; i<MAX_ITER-1; i++)
+		{
+			if (fabs(x - (double)ns[i]/(double)ds[i]) < 0.00005)
+			{
+				//printf("ANSWER= %u/%d\n",ns[i],ds[i]);
+				break;
+			}
+			//TODO: or, if the answers are the same as the last iteration, stop
+
+			zs[i+1] = 1.0f/(zs[i]-(int)floor(zs[i])); // 1/(fractional part of z_i)
+			ds[i+1] = ds[i]*(int)floor(zs[i+1])+ds[i-1];
+			double tmp = x*ds[i+1];
+			double tmp2 = tmp - (int)tmp;
+			ns[i+1] = tmp2 >= 0.5 ? ceil(tmp) : floor(tmp); // ghetto implementation of a rounding function
+			//printf("i=%lu, z=%20f n=%5u d=%5u\n",i,zs[i],ns[i],ds[i]);
+		}
+
+		//printf("APPROXIMATION= %u/%d\n",ns[i],ds[i]);
+		clockDomainDRAM->clock = ns[i];
+		clockDomainCPU->clock = ds[i];
+
+		//cout << "CTOR: callback address: " << (uint64_t)(this->callback) << "\t ratio="<<clock1<<"/"<<clock2<< endl;
 	}
 
 
